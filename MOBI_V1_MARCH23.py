@@ -341,8 +341,8 @@ def mill_recive():
     try:
         data_loc = serLoc.readline().decode().strip()
         serLoc.flush()
-        # serLoc.reset_output_buffer()
-        # serLoc.reset_input_buffer()
+        serLoc.reset_output_buffer()
+        serLoc.reset_input_buffer()
         if data_loc == "+OK" or data_loc == "":
             #If returning +Ok it could be the LoRa power cycling and might need the parameter rerun 
             return ["error"]
