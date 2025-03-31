@@ -73,6 +73,6 @@ def test_loop(ser : serial)->None:
 
 if __name__ == "__main__":
 
-    # ser = connect_port()
-    ser = serial.Serial("COM8" , 115200, timeout=1)
+    ser = connect_port()
+    # ser = serial.Serial("COM8" , 115200, timeout=1)
     test_loop(ser)

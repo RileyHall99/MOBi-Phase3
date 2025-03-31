@@ -43,8 +43,8 @@ def get_correct_ports()-> list:
     ports = list(serial.tools.list_ports.comports())
     return ports
 
-# ports = get_correct_ports()
-ports = None
+ports = get_correct_ports()
+# ports = None
 port_scale : str = ""
 port_loc : str = ""
 print(f"ports!!! ==>> {ports}")

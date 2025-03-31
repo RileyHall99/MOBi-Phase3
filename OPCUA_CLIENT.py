@@ -10,7 +10,8 @@ from queue import Queue
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Client")
 
-SERVER_URL = "opc.tcp://localhost:4840/mobi/server/"  # Local connection
+# SERVER_URL = "opc.tcp://localhost:4840/mobi/server/"  # Local connection
+SERVER_URL = "opc.tcp://10.0.0.221:4840/mobi/server/"  # Local connection
 NAMESPACE_URI = "http://mobi.opcua_server"
 data = {'Timestamp' : [] , 'Raw_Weight' : [] , 'Mill1' : [] , 'Mill2' : [] , 'Mill3' : [] , 'Mill4' : [], 'Mill5' : [], 'Mill6' : [], 'Loading' : [] , 'Mill1-Heartbeat' : [] , 'Mill2-Heartbeat' : []}
 weight = 0
@@ -169,7 +170,7 @@ async def main():
                 await browse_and_read(objects)
                 data_queue.put(data.copy())
                 print(data)
-                await asyncio.sleep(1)
+                # await asyncio.sleep(1)
                 
         except Exception as e:
             logger.error(f"Error in main: {str(e)}")
