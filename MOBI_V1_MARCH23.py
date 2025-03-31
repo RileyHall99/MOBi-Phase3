@@ -43,8 +43,8 @@ def get_correct_ports()-> list:
     ports = list(serial.tools.list_ports.comports())
     return ports
 
-ports = get_correct_ports()
-# ports = None
+# ports = get_correct_ports()
+ports = None
 port_scale : str = ""
 port_loc : str = ""
 print(f"ports!!! ==>> {ports}")
@@ -57,15 +57,15 @@ if(ports):
         elif("USB Serial Port" in i.description):
             port_scale = i.device
 else:
-    port_scale = "COM79" #Default ports ==> Scale Receiver 
+    port_scale = "COM7" #Default ports ==> Scale Receiver 
     port_loc = "COM3" #Default ports ==> LoRa 
 # Default Values
 DEFAULTS = {
-    "BUCKET_WEIGHT": 1710,
-    "MAX_RESIDUAL_WEIGHT": 100,  # kg, maximum deviation from bucket weight
-    "MIN_MATERIAL_WEIGHT": 1500,  # kg, minimum material loaded
-    "MIN_WEIGHT_DROP": 1000,     # kg, minimum material unloaded
-    "STABILITY_VARIANCE": 50,    # kg², variance threshold
+    "BUCKET_WEIGHT": 1710, #INFO ==>> Old Value 1710
+    "MAX_RESIDUAL_WEIGHT": 100,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
+    "MIN_MATERIAL_WEIGHT": 1500,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
+    "MIN_WEIGHT_DROP": 1500,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
+    "STABILITY_VARIANCE": 50,    # kg², variance threshold ==>> 50
     "TIMEOUT": 600,             # seconds
     "WEIGHT_BUFFER_COUNT": 5    # Size of weight buffer
 }
@@ -285,22 +285,27 @@ def check_network_connection():
     except requests.RequestException as e:
         print("Error occurred:", e)
 
-# Capture weights from scale
+# Capture weights from scale about 1 second per execution  
 def scaleWeight():
+    t1 = time.time()
     while True:
         with scale_lock:
             try:
                 serScale.timeout = 2  # Set a 1-second timeout
                 serScale.reset_input_buffer()
+                t2 = time.time()
+                print(f"RESET THE SERIAL BUFFEER TIME ==>> {t2-t1}")
                 data_scale = (
                     serScale.readline().decode("utf-8", errors="ignore").strip()
                 )
-                serScale.timeout = None  # Reset the timeout
+                print(f"THIS IS TIME TO GET THE SCALE WEIGHT ==>> {time.time() - t2}")
+                # serScale.timeout = None  # Reset the timeout
 
                 if data_scale:
                     match = re.search(FORMAT, data_scale)
                     if match:
                         weight = float(match.group(1))
+                        print(f"SCALE WEIGHT TIME ==>> {time.time() - t1}")
                         return weight
                     else:
                         print("Scale is NOT ON")
@@ -309,6 +314,7 @@ def scaleWeight():
                     print(
                         "Timeout: No data received from scale. PLEASE TURN ON SCALE RECEIVER"
                     )
+                    return 0
             except serial.SerialException as e:
                 print(f"Serial Exception: {e}")
                 break
@@ -323,6 +329,7 @@ def heartbeat_recive(location):
     Time = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     d = "D" + location
     data = {"Device": d, "Status": "Online", "LastTimestamp": Time}
+    
     try:
         payload = json.dumps(data)
         client.publish(
@@ -336,10 +343,45 @@ def heartbeat_recive(location):
         print(f"An error occurred: {e}")
         print("Heartbeat Recived but not sent\n")
 
+def process_input_data(data_loc : str):
+    print(f"PROCESSING DATA ==>> {data_loc}")
+    try:
+        if data_loc == "+OK" or data_loc == "" or "ERR" in data_loc.upper():
+        #If returning +Ok it could be the LoRa power cycling and might need the parameter rerun 
+            print("RETURNING ERROR!")
+            return ["error"]
+        else:
+                t1 = time.time()
+                print(f"THIS IS DATA RECEIVED ==>> {data_loc} ")
+                data = (
+                    data_loc.split(",")[2]
+                    .replace("#", ",")
+                    .replace(" : ", ",")
+                    .replace("'", "")
+                    .replace("{", "")
+                    .replace("}", "")
+                    .split(",")
+                )
+                type = data[1].strip()
+                mill = data[3].strip()
+                print(f"THIS IS TOTAL TIME OF THE FUNCTION STRING SPLICING ==>> {time.time() - t1}")
+    except (IndexError):
+        print(f"INDEX OUT OF RANGE! THIS IS DATA ==>> {data_loc}")
+        return ["error"]
+    except (AttributeError):
+        print(f"LIST HAS BEEN SENT NOT STRING! THIS IS DATA ==>> {data_loc} ")
+        return ['error']
+
+    return[type,mill]
+
 # Recives data via Lora from the location
 def mill_recive():
     try:
+        #Change 2 readline waits until there is a new line character read in. So if that never comes it can take a while for it to finish
+        #Also changing so that the data is processed in another function to deal exit the threading.lock quickly 
+        # serLoc.timeout = 0.1
         data_loc = serLoc.readline().decode().strip()
+        return data_loc
         serLoc.flush()
         serLoc.reset_output_buffer()
         serLoc.reset_input_buffer()
@@ -566,6 +608,7 @@ def OPCUA_Upload(location, leavetime, outweight, arrivetime, inweight):
 
 # Updates the heartbeat in OPCUA current heartbeat frecuency from Mill/Loading is every 10 minutes OPCUA HB resets every 1000 counts should be around 7 days
 def OPCUA_Heartbeat(location):
+
     print(f"OPCUA HEARTBEAT ==>> LOCATION ==>> {location}")
     def _get_variant_type(value):
         if isinstance(value, int):
@@ -634,7 +677,7 @@ def OPCUA_Heartbeat(location):
                 variant_type = _get_variant_type(HB_value)
                 HB_value += 1
                 #This value is changing from a 10000 to 1000
-                if HB_value == 10000:
+                if HB_value > 1000:
                     HB_value = 0
                 if variant_type:
                     mill_vars[f"{mill_name} Heartbeat"].set_value(
@@ -657,7 +700,7 @@ def OPCUA_Heartbeat(location):
                 HB_value = loading_vars["PC_Heartbeat"].get_value()
                 variant_type = _get_variant_type(HB_value)
                 HB_value += 1
-                if HB_value > 10000:
+                if HB_value > 1000:
                     HB_value = 0
                 if variant_type:
                     loading_vars["PC_Heartbeat"].set_value(
@@ -713,6 +756,7 @@ def OPCUA_Raw_weight(time, weight):
             print("Failed to disconnect from OPCUA", e)
 
 def OPCUA_Location_Status(location, status):
+    print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
     elif testmode == 2:
@@ -800,6 +844,7 @@ def OPCUA_Location_Status(location, status):
 
 # Loading location fill up logic
 def loadingStart(sysno):
+    print("STARTING LOADING")
     heartbeat_recive("0")
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Loading at {sTime}\n")
@@ -930,6 +975,8 @@ def unloadStart(tag, sysno):
     # Initial location check
     while True:
         data_loc = mill_recive()
+        data_loc = process_input_data(data_loc)
+        print(f"THIS IS UNLOAD START ==>> {data_loc}")
         if data_loc[0] == "Location" and data_loc[1] == tag:  # Fixed condition
             OPCUA_Location_Status(tag, 2)
             break
@@ -1038,50 +1085,72 @@ def unloadStart(tag, sysno):
         print("Connection to AWS failed. Data saved to Backup file\n")
 
 def task1():
+
     print("Starting Task 1")
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
+        print("NOT STOP THREADS!!!! ==>> ")
         response = None
         with loc_lock:
             response = mill_recive()
             print(f"RESPONSE==>>{response}")
-
+        #Change 1 ==>> Process the data outside of the thread lock. Allow other threads to execute 
+        response = process_input_data(response)
 
         if response == ["error"]:
+            print("ERROR RECIEVED")
             continue
-
+        
         data_type = response[0]
         data_location = response[1]
-
+        heart_thread = threading.Thread(target=heartbeat_recive , args=(data_location,))
+        print("PASS 1")
+        opcua_heart = threading.Thread(target=OPCUA_Heartbeat , args=(data_location,))
+        print("PASS 2")
         print(f"Data Type: {data_type} Data Location: {data_location}")
 
         if data_type == "Heartbeat":
-            heartbeat_recive(data_location)
-            OPCUA_Heartbeat(data_location)
+
+            # heartbeat_recive(data_location)
+            # OPCUA_Heartbeat(data_location)
+            heart_thread.start()
+            opcua_heart.start()
+            # heart_thread.join()
+            # opcua_heart.join()
+
+            
             continue
 
         elif data_type == "Location":
             if data_location == "0":
-                OPCUA_Location_Status("0", 2)
+                opcua_location = threading.Thread(target=OPCUA_Location_Status , args=("0" , 2))
+                opcua_location.start()
+                # OPCUA_Location_Status("0", 2)
                 weight = scaleWeight()
                 if weight <= BUCKET_WEIGHT:  
                     #OPCUA_Location_Status("0", 1)
                     loadingStart("1")
                 else:
-                    heartbeat_recive(data_location)
+                    # heartbeat_recive(data_location)
+                    heart_thread.start()
                     print(
                         f"Current scale Weight: {weight} \nBucket is still at Loading zone with a load or the bucket is not zeroed\n"
                     )
                     continue
             elif data_location in ("1", "2", "3", "4", "5", "6"):
-                OPCUA_Location_Status(data_location, 2)
+                opcua_location = threading.Thread(target=OPCUA_Location_Status , args=(data_location , 2))
+                print("BEFORE LOCATION STATUS CALL")
+                opcua_location.start()
+                # OPCUA_Location_Status(data_location, 2)
                 weight = scaleWeight()
                 if weight > BUCKET_WEIGHT + MIN_MATERIAL_WEIGHT:
                     #OPCUA_Location_Status(data_location, 1)
+                    
                     unloadStart(data_location, "1")
                 else:
-                    heartbeat_recive(data_location)
-                    print(f"Bucket at Mill {data_location}, Weight: {weight} kg - No unload triggered")
+                    # heartbeat_recive(data_location)
+                    heart_thread.start()
+                    print(f"Bucket at Mill {data_location}, Weight: {weight} kg - No unload triggered (TASK 1)")
                     continue
         else:
             print(
@@ -1092,12 +1161,13 @@ def task1():
             )
 
     print("ENd of task 1")
-# RAW WEIGHT for OPCUA and AWS also used for checking network connection
+# RAW WEIGHT for OPCUA and AWS also used for checking network connection this is fine because it operates on another thread 
 def task2():
     print("Starting Task 2")
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         time.sleep(2)  # Or 3, depends on how often you want to publish.
+        print("OPCUA-RAW-WEIGHT")
         weight = scaleWeight()
         Time = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         if testmode == 1 or testmode == 2:
@@ -1134,6 +1204,7 @@ def task3():
         time.sleep(120)
 
 def close_connections():
+    
     global stop_threads
     stop_threads = True  # set flag to true to stop threads
     print("Closing all connections and exiting...")
