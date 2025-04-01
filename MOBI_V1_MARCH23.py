@@ -36,6 +36,7 @@ baudrate_loc = 115200
 FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
+last_known_location : int = 0
 
 
 def get_correct_ports()-> list: 
@@ -755,7 +756,10 @@ def OPCUA_Raw_weight(time, weight):
         except Exception as e:
             print("Failed to disconnect from OPCUA", e)
 
+
+#Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 def OPCUA_Location_Status(location, status):
+    global last_known_location
     print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
@@ -779,22 +783,27 @@ def OPCUA_Location_Status(location, status):
                 var.get_browse_name().Name: var for var in loading.get_children()
             }
             try:
-                if status == 0:
-                    loading_vars["Loading Status"].set_value(
-                        False, varianttype=ua.VariantType.Boolean
-                    )
-                elif status == 1:
-                    loading_vars["Loading Status"].set_value(
-                        True, varianttype=ua.VariantType.Boolean
-                    )
-                elif status == 2:
-                    loading_vars["Loading Status"].set_value(
-                        True, varianttype=ua.VariantType.Boolean
-                    )
-                    time.sleep(1)
-                    loading_vars["Loading Status"].set_value(
-                        False, varianttype=ua.VariantType.Boolean
-                    )
+                if(last_known_location == location):
+                    if status == 0:
+                        loading_vars["Loading Status"].set_value(
+                            False, varianttype=ua.VariantType.Boolean
+                        )
+                    elif status == 1:
+                        loading_vars["Loading Status"].set_value(
+                            True, varianttype=ua.VariantType.Boolean
+                        )
+                    elif status == 2:
+                        loading_vars["Loading Status"].set_value(
+                            True, varianttype=ua.VariantType.Boolean
+                        )
+                        # time.sleep(1)
+                        # loading_vars["Loading Status"].set_value(
+                        #     False, varianttype=ua.VariantType.Boolean
+                        # )
+                else:
+                    loading_vars["Loading Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    last_known_location = location
+
             except Exception as e:
                 print(f"Error updating Loading Status to OPCUA in Loading: {e}")
         elif location in ["1", "2", "3", "4", "5", "6"]:
@@ -815,25 +824,30 @@ def OPCUA_Location_Status(location, status):
             mill_vars = {
                 var.get_browse_name().Name: var for var in mill_folder.get_children()
             }
-            try:
-                if status == 0:
-                    mill_vars[f"{mill_name} Status"].set_value(
-                        True, varianttype=ua.VariantType.Boolean
-                    )
-                elif status == 1:
-                    mill_vars[f"{mill_name} Status"].set_value(
-                        False, varianttype=ua.VariantType.Boolean
-                    )
-                elif status == 2:
-                    mill_vars[f"{mill_name} Status"].set_value(
-                        True, varianttype=ua.VariantType.Boolean
-                    )
-                    time.sleep(1)
-                    mill_vars[f"{mill_name} Status"].set_value(
-                        False, varianttype=ua.VariantType.Boolean
-                    )
-            except Exception as e:
-                print(f"Error updating {mill_name} Status to OPCUA: {e}")
+            if(last_known_location == location):
+                try:
+                    
+                    if status == 0:
+                        mill_vars[f"{mill_name} Status"].set_value(
+                            True, varianttype=ua.VariantType.Boolean
+                        )
+                    elif status == 1:
+                        mill_vars[f"{mill_name} Status"].set_value(
+                            False, varianttype=ua.VariantType.Boolean
+                        )
+                    elif status == 2:
+                        mill_vars[f"{mill_name} Status"].set_value(
+                            True, varianttype=ua.VariantType.Boolean
+                        )
+                        # time.sleep(1)
+                        # mill_vars[f"{mill_name} Status"].set_value(
+                        #     False, varianttype=ua.VariantType.Boolean
+                        # )
+                except Exception as e:
+                    print(f"Error updating {mill_name} Status to OPCUA: {e}")
+            else:
+                mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
+                last_known_location = location
     except Exception as e:
         print(f"OPCUA server not started\nError: {e}")
     finally:
