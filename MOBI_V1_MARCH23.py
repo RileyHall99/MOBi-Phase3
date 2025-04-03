@@ -25,6 +25,7 @@ import atexit
 import socket
 import serial.tools
 import serial.tools.list_ports
+from threading import Timer
 
 # Serial connection baudrate
 baudrate_scale = 9600
@@ -37,7 +38,7 @@ FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
 last_known_location : int = 0
-
+c_t1 = None
 
 def get_correct_ports()-> list: 
     print("Searching for available COM ports...")
@@ -756,10 +757,50 @@ def OPCUA_Raw_weight(time, weight):
         except Exception as e:
             print("Failed to disconnect from OPCUA", e)
 
+def call_back_timer():
+    print("CALL BACK TIMER!!!!!!! ==>>")
+    client = Client(OPCUA_Server_URL)
+    client.connect()
+    root = client.get_root_node()
+    objects = root.get_children()[0]
+    if(last_known_location == 0):
+
+        loading_zone = objects.get_child(["2:Loading Zone"])
+        loading = loading_zone.get_children()[
+            0
+        ]  # Get the Loading folder inside Loading Zone
+        loading_vars = {
+            var.get_browse_name().Name: var for var in loading.get_children()
+        }
+        loading_vars["Loading Status"].set_value(
+        False, varianttype=ua.VariantType.Boolean
+        )
+    else:
+        mill_name = f"Mill {last_known_location}"
+        mills_folder = objects.get_child(["2:Mills"])
+
+        # Dynamically find the correct mill folder
+        mill_folder = None
+        for child in mills_folder.get_children():
+            if child.get_browse_name().Name == mill_name:
+                mill_folder = child
+                break
+
+        if mill_folder is None:  # Handle case where mill is not found
+            print(f"Error: Mill folder {mill_name} not found")
+            return
+
+        mill_vars = {
+            var.get_browse_name().Name: var for var in mill_folder.get_children()
+        }
+        mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
 
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
+#TODO CLOSE THE THREADS!!!!
+
 def OPCUA_Location_Status(location, status):
     global last_known_location
+    global c_t1
     print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
@@ -773,8 +814,12 @@ def OPCUA_Location_Status(location, status):
         client.connect()
         root = client.get_root_node()
         objects = root.get_children()[0]
-
+        if(c_t1 is not None):
+            c_t1.cancel()
+        c_t1 = Timer(10.0,call_back_timer )
+        print("TIMER CREATED!!!!!")
         if location == "0":
+
             loading_zone = objects.get_child(["2:Loading Zone"])
             loading = loading_zone.get_children()[
                 0
@@ -800,9 +845,16 @@ def OPCUA_Location_Status(location, status):
                         # loading_vars["Loading Status"].set_value(
                         #     False, varianttype=ua.VariantType.Boolean
                         # )
+                        #TODO Implement a callback timer here ~10 seconds 
+                        
+                        c_t1.start()
+                        print("TIMER STARTED!!!!")
                 else:
-                    loading_vars["Loading Status"].set_value(False , varianttype=ua.VariantType.Boolean)
                     last_known_location = location
+                    c_t1.start()
+                    print("TIMER STARTED ")
+                    loading_vars["Loading Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    
 
             except Exception as e:
                 print(f"Error updating Loading Status to OPCUA in Loading: {e}")
@@ -842,12 +894,21 @@ def OPCUA_Location_Status(location, status):
                         # time.sleep(1)
                         # mill_vars[f"{mill_name} Status"].set_value(
                         #     False, varianttype=ua.VariantType.Boolean
-                        # )
+                        # )a
+                        
+                        #TODO Implement a callback timer here ~10 seconds 
+                        
+                        c_t1.start()
+                        print("TIMER STARTED LCATION IS THE SAME")
                 except Exception as e:
                     print(f"Error updating {mill_name} Status to OPCUA: {e}")
             else:
-                mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
                 last_known_location = location
+                print(f"NEW LOCATION ==>> {last_known_location}")
+                c_t1.start()
+                print("TIMER STARTED LOCATION IS DIFFERENT!!!")
+                print(f"Setting location!!!!!!!!!!!!!!! ==>> Previous location ==>> {last_known_location} New location ==>> {location}")
+                mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
     except Exception as e:
         print(f"OPCUA server not started\nError: {e}")
     finally:
@@ -1103,7 +1164,6 @@ def task1():
     print("Starting Task 1")
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
-        print("NOT STOP THREADS!!!! ==>> ")
         response = None
         with loc_lock:
             response = mill_recive()
@@ -1112,16 +1172,13 @@ def task1():
         response = process_input_data(response)
 
         if response == ["error"]:
-            print("ERROR RECIEVED")
             continue
         
         data_type = response[0]
         data_location = response[1]
         heart_thread = threading.Thread(target=heartbeat_recive , args=(data_location,))
-        print("PASS 1")
         opcua_heart = threading.Thread(target=OPCUA_Heartbeat , args=(data_location,))
-        print("PASS 2")
-        print(f"Data Type: {data_type} Data Location: {data_location}")
+        
 
         if data_type == "Heartbeat":
 
@@ -1153,7 +1210,6 @@ def task1():
                     continue
             elif data_location in ("1", "2", "3", "4", "5", "6"):
                 opcua_location = threading.Thread(target=OPCUA_Location_Status , args=(data_location , 2))
-                print("BEFORE LOCATION STATUS CALL")
                 opcua_location.start()
                 # OPCUA_Location_Status(data_location, 2)
                 weight = scaleWeight()
