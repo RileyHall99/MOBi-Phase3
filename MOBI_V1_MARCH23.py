@@ -63,11 +63,11 @@ else:
     port_loc = "COM3" #Default ports ==> LoRa 
 # Default Values
 DEFAULTS = {
-    "BUCKET_WEIGHT": 1710, #INFO ==>> Old Value 1710
+    "BUCKET_WEIGHT": 1, #INFO ==>> Old Value 1710
     "MAX_RESIDUAL_WEIGHT": 100,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
-    "MIN_MATERIAL_WEIGHT": 1500,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
-    "MIN_WEIGHT_DROP": 1500,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
-    "STABILITY_VARIANCE": 50,    # kg², variance threshold ==>> 50
+    "MIN_MATERIAL_WEIGHT": 10,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
+    "MIN_WEIGHT_DROP": 5,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
+    "STABILITY_VARIANCE": 2,    # kg², variance threshold ==>> 50
     "TIMEOUT": 600,             # seconds
     "WEIGHT_BUFFER_COUNT": 5    # Size of weight buffer
 }
