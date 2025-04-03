@@ -2,7 +2,7 @@ import serial.tools
 import serial.tools.list_ports
 import random
 import time
-
+import threading
 
 def to_txt(data : str = "")-> None:
     with open("./pc_monitoring.txt" , "a")as file:
@@ -38,8 +38,44 @@ def connect_port():
         print("Cant find port")
         exit()
 
+#Use a thread call back timer to call this function every two minutes 
+def heartbeats(ser : serial.Serial) -> None:
+    hearbeat_0 = f"{{'Type' : 'Heartbeat' # 'Value' : 0}}"
+    hearbeat_2 = f"{{'Type' : 'Heartbeat' # 'Value' : 2}}"
+    print("HEARTBEAT!!!")
+    while(True):
+        time.sleep(120)
+        ser.write(f"AT+SEND=100,{len(hearbeat_0)},{hearbeat_0}\r\n".encode())
+        time.sleep(1)
+        ser.write(f"AT+SEND=100,{len(hearbeat_2)},{hearbeat_2}\r\n".encode())
+        
 
-def test_loop(ser : serial)->None:
+def site_simulation_Mill0(ser : serial.Serial) -> None: 
+    data = f"{{'Type' : 'Location' # 'Value' : 0}}"
+
+    while(True):
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
+
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
+
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(5)
+
+def site_simulation_Mill2(ser : serial.Serial) -> None: 
+    ser.write(b"AT+PARAMETER=10,7,2,7\r\n")
+    data = f"{{'Type' : 'Location' # 'Value' : 2}}"
+
+    while(True):
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(5)
+
+def test_loop(ser : serial.Serial)->None:
     locations = [6,0,2]
     ser.write(b"AT+PARAMETER=10,7,2,7\r\n")
     
@@ -74,5 +110,17 @@ def test_loop(ser : serial)->None:
 if __name__ == "__main__":
 
     ser = connect_port()
-    # ser = serial.Serial("COM8" , 115200, timeout=1)
-    test_loop(ser)
+    # ser = serial.Serial("COM10" , 115200, timeout=1)
+    ser.write(b"AT+PARAMETER=10,7,2,7\r\n")
+
+    # c_t1 = Timer(120.0, heartbeats , args=(ser,))
+    c_t1 = threading.Thread(target=heartbeats , args=(ser,))
+    c_t1.start()
+
+    #INFO How to run ==>> Comment one out and let it run.
+    #MILL1 TEST LOOP
+    site_simulation_Mill0(ser)
+    #MILL2 TEST LOOP
+    site_simulation_Mill2(ser)
+
+    # test_loop(ser)
