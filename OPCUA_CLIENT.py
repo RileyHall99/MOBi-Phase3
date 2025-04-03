@@ -7,13 +7,14 @@ import time
 import threading 
 import pandas as pd
 from queue import Queue
+from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Client")
 
 # SERVER_URL = "opc.tcp://localhost:4840/mobi/server/"  # Local connection
 SERVER_URL = "opc.tcp://10.0.0.221:4840/mobi/server/"  # Local connection
 NAMESPACE_URI = "http://mobi.opcua_server"
-data = {'Timestamp' : [] , 'Raw_Weight' : [] , 'Mill1' : [] , 'Mill2' : [] , 'Mill3' : [] , 'Mill4' : [], 'Mill5' : [], 'Mill6' : [], 'Loading' : [] , 'Mill1-Heartbeat' : [] , 'Mill2-Heartbeat' : []}
+data = {'Timestamp' : [] , 'Raw_Weight' : [] , 'Mill1' : [] , 'Mill2' : [] , 'Mill3' : [] , 'Mill4' : [], 'Mill5' : [], 'Mill6' : [], 'Loading' : [] , 'Mill1-Heartbeat' : [] , 'Mill2-Heartbeat' : [] , 'Mill1_Load' : [] , 'loading_load' : []}
 weight = 0
 mill1_location = False
 mill2_location = False
@@ -24,6 +25,9 @@ mill6_location = False
 loading_location = False
 mill1_heartbeat = 0
 mill2_heartbeat = 0
+mill1_load = 0.0
+loading_load = 0.0
+
 data_queue = Queue()
 
 async def browse_and_read(node, depth=0):
@@ -37,7 +41,8 @@ async def browse_and_read(node, depth=0):
     global loading_location
     global mill1_heartbeat
     global mill2_heartbeat
-
+    global mill1_load
+    global loading_load
     value_changed = False
     """
     Recursively browses OPC UA nodes and reads values if they are Variables.
@@ -49,7 +54,6 @@ async def browse_and_read(node, depth=0):
 
     if node_class == ua.NodeClass.Variable:
         value = await node.read_value()
-        logger.info(f"{indent}  Node Name ==>> {browse_name}\n_________________\nDATA Value ==>>  {value} \n _______________")
         if('Mill 1 Status' in browse_name.Name ):
             mill1_location = value
             value_changed = True
@@ -85,9 +89,14 @@ async def browse_and_read(node, depth=0):
         elif('Mill 2 Heartbeat' in browse_name.Name):
             mill2_heartbeat = value
             value_changed = True
+        elif('Mill 1 Leave Weight' in  browse_name.Name):
+            mill1_load = value
+        elif('Loading Leave Weight' in  browse_name.Name):
+            loading_load = value
             # data['Raw_Weight'].append(weight)
             # data['Timestamp'].append(time.time())
         if(value_changed):
+            logger.info(f"{indent}  Node Name ==>> {browse_name}\n_________________\nDATA Value ==>>  {value} \n _______________")
             data["Mill1"].append(mill1_location)
             data["Mill2"].append(mill2_location)
             data["Mill3"].append(mill3_location)
@@ -96,9 +105,11 @@ async def browse_and_read(node, depth=0):
             data["Mill6"].append(mill6_location)
             data["Loading"].append(loading_location)
             data['Raw_Weight'].append(weight)
-            data['Timestamp'].append(time.time())
+            data['Timestamp'].append(datetime.now())
             data['Mill1-Heartbeat'].append(mill1_heartbeat)
             data['Mill2-Heartbeat'].append(mill2_heartbeat)
+            data['Mill1_Load'].append(mill1_load)
+            data['loading_load'].append(loading_load)
     else:
         children = await node.get_children()
         for child in children:
@@ -119,7 +130,7 @@ def update_graphs(data_queue):
         if not df.empty:
             df_long = df.melt(
                 id_vars=['Timestamp'],
-                value_vars=['Raw_Weight', 'Mill1', 'Mill2', 'Mill3','Mill4','Mill5','Mill6' ,'Loading' , 'Mill1-Heartbeat' ],
+                value_vars=['Raw_Weight', 'Mill1', 'Mill2' , 'Mill1_Load' ,'Loading' , 'Mill1-Heartbeat' , 'Mill2-Heartbeat' , 'loading_load' ],
                 var_name='Variable',
                 value_name='Value'
             )
@@ -169,7 +180,7 @@ async def main():
             while True:
                 await browse_and_read(objects)
                 data_queue.put(data.copy())
-                print(data)
+                # print(data)
                 # await asyncio.sleep(1)
                 
         except Exception as e:
