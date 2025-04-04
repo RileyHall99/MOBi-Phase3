@@ -820,7 +820,15 @@ def OPCUA_Location_Status(location, status):
         c_t1 = Timer(10.0,call_back_timer )
         print("TIMER CREATED!!!!!")
         if location == "0":
-
+            mills_folder = objects.get(["2:mills"])
+            mill_folder = None
+            for child in mills_folder.get_children():
+                if child.get_browse_name().Name == mill_name:
+                    mill_folder = child
+                    break
+            mill_vars = {
+                var.get_browse_name().Name: var for var in mill_folder.get_children()
+            }
             loading_zone = objects.get_child(["2:Loading Zone"])
             loading = loading_zone.get_children()[
                 0
@@ -853,7 +861,7 @@ def OPCUA_Location_Status(location, status):
                 else:
                     c_t1.start()
                     print("TIMER STARTED ")
-                    loading_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
                     last_known_location = location
                     print(f"LOCATION CHANGED ==>> {last_known_location}")
 
