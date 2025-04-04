@@ -794,6 +794,7 @@ def call_back_timer():
             var.get_browse_name().Name: var for var in mill_folder.get_children()
         }
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
+        print("VALUE SWITCHED TO NEGATIVE")
 
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 #TODO CLOSE THE THREADS!!!!
@@ -850,11 +851,11 @@ def OPCUA_Location_Status(location, status):
                         c_t1.start()
                         print("TIMER STARTED!!!!")
                 else:
-                    last_known_location = location
                     c_t1.start()
                     print("TIMER STARTED ")
-                    loading_vars["Loading Status"].set_value(False , varianttype=ua.VariantType.Boolean)
-                    
+                    loading_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    last_known_location = location
+                    print(f"LOCATION CHANGED ==>> {last_known_location}")
 
             except Exception as e:
                 print(f"Error updating Loading Status to OPCUA in Loading: {e}")
@@ -895,7 +896,7 @@ def OPCUA_Location_Status(location, status):
                         # mill_vars[f"{mill_name} Status"].set_value(
                         #     False, varianttype=ua.VariantType.Boolean
                         # )a
-                        
+                    
                         #TODO Implement a callback timer here ~10 seconds 
                         
                         c_t1.start()
