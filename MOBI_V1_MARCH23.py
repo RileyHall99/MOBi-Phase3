@@ -37,7 +37,7 @@ baudrate_loc = 115200
 FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
-last_known_location : int = 0
+last_known_location : str = "0"
 c_t1 = None
 
 def get_correct_ports()-> list: 
@@ -64,8 +64,8 @@ else:
 # Default Values
 DEFAULTS = {
     "BUCKET_WEIGHT": 1, #INFO ==>> Old Value 1710
-    "MAX_RESIDUAL_WEIGHT": 100,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
-    "MIN_MATERIAL_WEIGHT": 10,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
+    "MAX_RESIDUAL_WEIGHT": 2,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
+    "MIN_MATERIAL_WEIGHT": 5,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
     "MIN_WEIGHT_DROP": 5,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
     "STABILITY_VARIANCE": 2,    # kg², variance threshold ==>> 50
     "TIMEOUT": 600,             # seconds
@@ -763,7 +763,7 @@ def call_back_timer():
     client.connect()
     root = client.get_root_node()
     objects = root.get_children()[0]
-    if(last_known_location == 0):
+    if(last_known_location == "0"):
 
         loading_zone = objects.get_child(["2:Loading Zone"])
         loading = loading_zone.get_children()[
@@ -817,18 +817,10 @@ def OPCUA_Location_Status(location, status):
         objects = root.get_children()[0]
         if(c_t1 is not None):
             c_t1.cancel()
-        c_t1 = Timer(10.0,call_back_timer )
+        c_t1 = Timer(15.0,call_back_timer )
         print("TIMER CREATED!!!!!")
-        if location == "0":
-            mills_folder = objects.get(["2:mills"])
-            mill_folder = None
-            for child in mills_folder.get_children():
-                if child.get_browse_name().Name == mill_name:
-                    mill_folder = child
-                    break
-            mill_vars = {
-                var.get_browse_name().Name: var for var in mill_folder.get_children()
-            }
+        if location == "0": 
+            
             loading_zone = objects.get_child(["2:Loading Zone"])
             loading = loading_zone.get_children()[
                 0
@@ -837,7 +829,13 @@ def OPCUA_Location_Status(location, status):
                 var.get_browse_name().Name: var for var in loading.get_children()
             }
             try:
+                print("pleaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                print(type(last_known_location))
+                print(f"values of lastknow{last_known_location}")
+                print(type(location))
+                print(f"values of location{location}")
                 if(last_known_location == location):
+                    print("why nooooooooooooooooooooooooooooooooooooooooooooooooo")
                     if status == 0:
                         loading_vars["Loading Status"].set_value(
                             False, varianttype=ua.VariantType.Boolean
@@ -861,6 +859,19 @@ def OPCUA_Location_Status(location, status):
                 else:
                     c_t1.start()
                     print("TIMER STARTED ")
+                    
+                    mill_name = f"Mill {last_known_location}"
+                    mills_folder = objects.get_child(["2:Mills"])
+                    mill_folder = None
+                    for child in mills_folder.get_children():
+                        if child.get_browse_name().Name == mill_name:
+                            mill_folder = child
+                            break    
+                        
+                    print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+                    mill_vars = {
+                        var.get_browse_name().Name: var for var in mill_folder.get_children()
+                    }
                     mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
                     last_known_location = location
                     print(f"LOCATION CHANGED ==>> {last_known_location}")
