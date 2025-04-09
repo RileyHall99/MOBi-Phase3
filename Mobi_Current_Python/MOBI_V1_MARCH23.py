@@ -1327,6 +1327,48 @@ def close_connections():
 # Register the exit handler
 atexit.register(close_connections)
 
+
+#This method is used to switch all locations statuses to false on start. To clean up if it shutdown during use
+def on_start():
+
+    client = Client(OPCUA_Server_URL)
+    client.connect()
+    root = client.get_root_node()
+    objects = root.get_children[0]
+
+    #Switch Loading Zone to false on start
+    loading_zone = objects.get_child(["2:Loading Zone"])
+    loading = loading_zone.get_children()[
+        0
+    ]  # Get the Loading folder inside Loading Zone
+    loading_vars = {
+        var.get_browse_name().Name: var for var in loading.get_children()
+    }
+
+    loading_vars["Loading Status"].set_value(
+        False, varianttype=ua.VariantType.Boolean
+    )
+
+    #Switching Mills to false
+    mills_folder = objects.get_child(["2:Mills"])
+    mill_folder = None
+
+    for i in range(6):
+        try:
+            mill_name = f"Mill {i}"
+            for child in mills_folder.get_children():
+                if child.get_browse_name().Name == mill_name:
+                    mill_folder = child
+                    break  
+            mill_vars = {
+            var.get_browse_name().Name: var for var in mill_folder.get_children()
+        }
+            mill_vars[f"{mill_name} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+        except Exception as e:
+            print(f"There seems to be an error with on_start ==>> {e.args[0]}")
+
+
+
 def reset_all_historic(sysno):
     """Resets historical data for all mills in a system."""
     if sysno in ("1", "2"):
