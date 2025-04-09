@@ -956,7 +956,6 @@ def loadingStart(sysno):
     inweight = scaleWeight()
 
     # Buffer for stability check (5 seconds)
-    weight_buffer = []
     start_time = time.time()
     leave_counter = 0
 
@@ -978,24 +977,24 @@ def loadingStart(sysno):
                 OPCUA_Location_Status(data_loc[1], 2)
             return
 
+    #it times out after 5 minute 
     while time.time() - start_time < TIMEOUT:
         weight = scaleWeight()
-        weight_buffer.append(weight)
-        if len(weight_buffer) > WEIGHT_BUFFER_COUNT:
-            weight_buffer.pop(0)
-
         print(f"Current Weight: {weight} kg")
 
-        # Check stability with significant load
-        if (len(weight_buffer) == WEIGHT_BUFFER_COUNT and 
-            weight >= BUCKET_WEIGHT + MIN_MATERIAL_WEIGHT):
-            avg = sum(weight_buffer) / WEIGHT_BUFFER_COUNT
-            variance = sum((w - avg) ** 2 for w in weight_buffer) / WEIGHT_BUFFER_COUNT
-            if variance < STABILITY_VARIANCE:
-                eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-                print(f"Loading complete at {eTime}, Weight: {weight} kg")
-                break
-
+        # variable to signifiy 10 less wieght on the bucket
+        Dweight = inweight * 1.10
+        
+        #if the arrival wieght is greater than the current weight it means its getting loaded
+        if (weight > Dweight):
+            eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+            print(f"Loading at {eTime}, Weight: {weight} kg")
+            break
+        else:
+            print("Still at loading zone")
+            
+            
+            
         # Check if crane left the zone without loading
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
