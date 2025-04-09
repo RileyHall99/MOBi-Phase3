@@ -37,7 +37,7 @@ baudrate_loc = 115200
 FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
-last_known_location : int = 0
+last_known_location : str = "0"
 c_t1 = None
 
 def get_correct_ports()-> list: 
@@ -63,11 +63,11 @@ else:
     port_loc = "COM3" #Default ports ==> LoRa 
 # Default Values
 DEFAULTS = {
-    "BUCKET_WEIGHT": 1710, #INFO ==>> Old Value 1710
-    "MAX_RESIDUAL_WEIGHT": 100,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
-    "MIN_MATERIAL_WEIGHT": 1500,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
-    "MIN_WEIGHT_DROP": 1500,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
-    "STABILITY_VARIANCE": 50,    # kg², variance threshold ==>> 50
+    "BUCKET_WEIGHT": 1.3, #INFO ==>> Old Value 1710
+    "MAX_RESIDUAL_WEIGHT": .2,  # kg, maximum deviation from bucket weight OLD Value ==>> 100
+    "MIN_MATERIAL_WEIGHT": 3,  # kg, minimum material loaded ==>> MIN_MATERIAL_WEIGHT ==>> 1500
+    "MIN_WEIGHT_DROP": 3,     # kg, minimum material unloaded ==>> MIN WEIGHT DROP ==>> 1500
+    "STABILITY_VARIANCE": 20,    # kg², variance threshold ==>> 50
     "TIMEOUT": 600,             # seconds
     "WEIGHT_BUFFER_COUNT": 5    # Size of weight buffer
 }
@@ -290,39 +290,40 @@ def check_network_connection():
 # Capture weights from scale about 1 second per execution  
 def scaleWeight():
     t1 = time.time()
-    while True:
+    count=0
+    while count < 3:
         with scale_lock:
             try:
                 serScale.timeout = 2  # Set a 1-second timeout
                 serScale.reset_input_buffer()
                 t2 = time.time()
-                print(f"RESET THE SERIAL BUFFEER TIME ==>> {t2-t1}")
                 data_scale = (
                     serScale.readline().decode("utf-8", errors="ignore").strip()
                 )
-                print(f"THIS IS TIME TO GET THE SCALE WEIGHT ==>> {time.time() - t2}")
                 # serScale.timeout = None  # Reset the timeout
 
                 if data_scale:
                     match = re.search(FORMAT, data_scale)
                     if match:
                         weight = float(match.group(1))
-                        print(f"SCALE WEIGHT TIME ==>> {time.time() - t1}")
                         return weight
                     else:
                         print("Scale is NOT ON")
-                        return 0
+                        count+=1
+                        
                 else:
                     print(
                         "Timeout: No data received from scale. PLEASE TURN ON SCALE RECEIVER"
                     )
-                    return 0
+                    count+=1
+                    
             except serial.SerialException as e:
                 print(f"Serial Exception: {e}")
                 break
             except Exception as e:
                 print(f"An error occurred: {e}")
-                break
+               
+    return 0
 
 # Heartbeat Recive from location
 def heartbeat_recive(location):
@@ -366,7 +367,6 @@ def process_input_data(data_loc : str):
                 )
                 type = data[1].strip()
                 mill = data[3].strip()
-                print(f"THIS IS TOTAL TIME OF THE FUNCTION STRING SPLICING ==>> {time.time() - t1}")
     except (IndexError):
         print(f"INDEX OUT OF RANGE! THIS IS DATA ==>> {data_loc}")
         return ["error"]
@@ -758,12 +758,13 @@ def OPCUA_Raw_weight(time, weight):
             print("Failed to disconnect from OPCUA", e)
 
 def call_back_timer():
-    print("CALL BACK TIMER!!!!!!! ==>>")
+    print(f"CALL BACK TIMER!!!!!!! ========================================================================>>{last_known_location} --------------------------{type(last_known_location)}")
+    
     client = Client(OPCUA_Server_URL)
     client.connect()
     root = client.get_root_node()
     objects = root.get_children()[0]
-    if(last_known_location == 0):
+    if(last_known_location == "0"):
 
         loading_zone = objects.get_child(["2:Loading Zone"])
         loading = loading_zone.get_children()[
@@ -794,6 +795,8 @@ def call_back_timer():
             var.get_browse_name().Name: var for var in mill_folder.get_children()
         }
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
+        print("VALUE SWITCHED TO NEGATIVE")
+    return
 
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 #TODO CLOSE THE THREADS!!!!
@@ -816,10 +819,10 @@ def OPCUA_Location_Status(location, status):
         objects = root.get_children()[0]
         if(c_t1 is not None):
             c_t1.cancel()
-        c_t1 = Timer(10.0,call_back_timer )
+        c_t1 = Timer(15.0,call_back_timer )
         print("TIMER CREATED!!!!!")
-        if location == "0":
-
+        if location == "0": 
+            
             loading_zone = objects.get_child(["2:Loading Zone"])
             loading = loading_zone.get_children()[
                 0
@@ -828,6 +831,7 @@ def OPCUA_Location_Status(location, status):
                 var.get_browse_name().Name: var for var in loading.get_children()
             }
             try:
+            
                 if(last_known_location == location):
                     if status == 0:
                         loading_vars["Loading Status"].set_value(
@@ -850,11 +854,24 @@ def OPCUA_Location_Status(location, status):
                         c_t1.start()
                         print("TIMER STARTED!!!!")
                 else:
-                    last_known_location = location
                     c_t1.start()
                     print("TIMER STARTED ")
-                    loading_vars["Loading Status"].set_value(False , varianttype=ua.VariantType.Boolean)
                     
+                    mill_name = f"Mill {last_known_location}"
+                    mills_folder = objects.get_child(["2:Mills"])
+                    mill_folder = None
+                    for child in mills_folder.get_children():
+                        if child.get_browse_name().Name == mill_name:
+                            mill_folder = child
+                            break    
+                        
+                    print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+                    mill_vars = {
+                        var.get_browse_name().Name: var for var in mill_folder.get_children()
+                    }
+                    mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    last_known_location = location
+                    print(f"LOCATION CHANGED ==>> {last_known_location}")
 
             except Exception as e:
                 print(f"Error updating Loading Status to OPCUA in Loading: {e}")
@@ -895,7 +912,7 @@ def OPCUA_Location_Status(location, status):
                         # mill_vars[f"{mill_name} Status"].set_value(
                         #     False, varianttype=ua.VariantType.Boolean
                         # )a
-                        
+                    
                         #TODO Implement a callback timer here ~10 seconds 
                         
                         c_t1.start()
@@ -933,6 +950,7 @@ def loadingStart(sysno):
     # Initial location check
     while True:
         data_loc = mill_recive()
+        data_loc = process_input_data(data_loc)
         if data_loc[0] == "Location" and data_loc[1] == "0":
             OPCUA_Location_Status("0", 2)
             break
@@ -967,6 +985,7 @@ def loadingStart(sysno):
 
         # Check if crane left the zone without loading
         data_loc = mill_recive()
+        data_loc = process_input_data(data_loc)
         if data_loc[0] == "Location":
             if data_loc[1] != "0":
                 leave_counter += 1
@@ -1078,12 +1097,11 @@ def unloadStart(tag, sysno):
 
         if inweight - weight >= MIN_WEIGHT_DROP:
             has_unloaded = True
-
-        if (has_unloaded and 
-            len(weight_buffer) == WEIGHT_BUFFER_COUNT and 
-            abs(weight - BUCKET_WEIGHT) <= MAX_RESIDUAL_WEIGHT):
+        print(f"weight bufreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{weight_buffer}")
+        if (has_unloaded and len(weight_buffer) == WEIGHT_BUFFER_COUNT and abs(weight - BUCKET_WEIGHT) <= MAX_RESIDUAL_WEIGHT):
             avg = sum(weight_buffer) / WEIGHT_BUFFER_COUNT
             variance = sum((w - avg) ** 2 for w in weight_buffer) / WEIGHT_BUFFER_COUNT
+            print(f"HEre is the variance {variance}--------------------------------------------------------------------------------------------------------------------------------")
             if variance < STABILITY_VARIANCE:
                 eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
                 print(f"Unloading complete at {eTime}, Weight: {weight} kg")
@@ -1091,6 +1109,7 @@ def unloadStart(tag, sysno):
 
         # Check if crane left the zone without unloading
         data_loc = mill_recive()
+        data_loc = process_input_data(data_loc)
         if data_loc[0] == "Location":
             if data_loc[1] != tag:
                 leave_counter += 1
@@ -1215,8 +1234,8 @@ def task1():
                 weight = scaleWeight()
                 if weight > BUCKET_WEIGHT + MIN_MATERIAL_WEIGHT:
                     #OPCUA_Location_Status(data_location, 1)
-                    
                     unloadStart(data_location, "1")
+                    
                 else:
                     # heartbeat_recive(data_location)
                     heart_thread.start()
