@@ -835,21 +835,34 @@ def OPCUA_Location_Status(location, status):
                     c_t1.start()
                     print("TIMER STARTED ")
                     
-                    mill_name = f"Mill {last_known_location}"
-                    mills_folder = objects.get_child(["2:Mills"])
-                    mill_folder = None
-                    for child in mills_folder.get_children():
-                        if child.get_browse_name().Name == mill_name:
-                            mill_folder = child
-                            break    
-                        
-                    print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
-                    mill_vars = {
-                        var.get_browse_name().Name: var for var in mill_folder.get_children()
-                    }
-                    mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                    if(last_known_location != "0"):
+                        mill_name = f"Mill {last_known_location}"
+                        mills_folder = objects.get_child(["2:Mills"])
+                        mill_folder = None
+                        for child in mills_folder.get_children():
+                            if child.get_browse_name().Name == mill_name:
+                                mill_folder = child
+                                break    
+                            
+                        print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+                        mill_vars = {
+                            var.get_browse_name().Name: var for var in mill_folder.get_children()
+                        }
+                        mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                        last_known_location = location
+                        print(f"LOCATION CHANGED ==>> {last_known_location}")
+                    else:
+                        loading_zone = objects.get_child(["2:Loading Zone"])
+                        loading = loading_zone.get_children()[
+                            0
+                        ]  # Get the Loading folder inside Loading Zone
+                        loading_vars = {
+                            var.get_browse_name().Name: var for var in loading.get_children()
+                        }
+                        loading_vars["Loading Status"].set_value(
+                            False, varianttype=ua.VariantType.Boolean
+                        )
                     last_known_location = location
-                    print(f"LOCATION CHANGED ==>> {last_known_location}")
 
             except Exception as e:
                 print(f"Error updating Loading Status to OPCUA in Loading: {e}")
@@ -898,12 +911,34 @@ def OPCUA_Location_Status(location, status):
                 except Exception as e:
                     print(f"Error updating {mill_name} Status to OPCUA: {e}")
             else:
-                print(f"NEW LOCATION ==>> {last_known_location}")
-                c_t1.start()
-                print("TIMER STARTED LOCATION IS DIFFERENT!!!")
-                print(f"Setting location!!!!!!!!!!!!!!! ==>> Previous location ==>> {last_known_location} New location ==>> {location}")
-                mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
-                last_known_location = location
+                    if(last_known_location != "0"):
+                        mill_name = f"Mill {last_known_location}"
+                        mills_folder = objects.get_child(["2:Mills"])
+                        mill_folder = None
+                        for child in mills_folder.get_children():
+                            if child.get_browse_name().Name == mill_name:
+                                mill_folder = child
+                                break    
+                            
+                        print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+                        mill_vars = {
+                            var.get_browse_name().Name: var for var in mill_folder.get_children()
+                        }
+                        mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
+                        print(f"LOCATION CHANGED ==>> {last_known_location}")
+                    else:
+                        loading_zone = objects.get_child(["2:Loading Zone"])
+                        loading = loading_zone.get_children()[
+                            0
+                        ]  # Get the Loading folder inside Loading Zone
+                        loading_vars = {
+                            var.get_browse_name().Name: var for var in loading.get_children()
+                        }
+                        loading_vars["Loading Status"].set_value(
+                            False, varianttype=ua.VariantType.Boolean
+                        )
+                    last_known_location = location
+                    
     except Exception as e:
         print(f"OPCUA server not started\nError: {e}")
     finally:
