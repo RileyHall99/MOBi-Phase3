@@ -52,15 +52,30 @@ def heartbeats(ser : serial.Serial) -> None:
 
 def site_simulation_Mill0(ser : serial.Serial) -> None: 
     data = f"{{'Type' : 'Location' # 'Value' : 0}}"
-
+    count = 0
     while(True):
         print(data )
         ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
         time.sleep(1)
-
+        
         ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
         time.sleep(1)
 
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(5)
+        count+=3    
+        print(f"Times sent ==>> {count}")
+
+
+def site_simulation_Mill1(ser : serial.Serial) -> None: 
+    ser.write(b"AT+PARAMETER=10,7,2,7\r\n")
+    data = f"{{'Type' : 'Location' # 'Value' : 1}}"
+
+    while(True):
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
+        ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
+        time.sleep(1)
         ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
         time.sleep(5)
 
@@ -120,8 +135,9 @@ if __name__ == "__main__":
 
     #INFO How to run ==>> Comment one out and let it run.
     #MILL1 TEST LOOP
-    site_simulation_Mill0(ser)
+    # site_simulation_Mill0(ser)
+    # site_simulation_Mill1(ser)
     #MILL2 TEST LOOP
-    # site_simulation_Mill2(ser)
+    site_simulation_Mill2(ser)
 
     # test_loop(ser)

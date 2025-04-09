@@ -38,6 +38,7 @@ FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
 last_known_location : str = "0"
+last_qualified_weight = 0
 c_t1 = None
 
 def get_correct_ports()-> list: 
@@ -290,7 +291,7 @@ def check_network_connection():
 # Capture weights from scale about 1 second per execution  
 def scaleWeight():
     t1 = time.time()
-    count=0
+    count = 0
     while count < 3:
         with scale_lock:
             try:
@@ -309,8 +310,7 @@ def scaleWeight():
                         return weight
                     else:
                         print("Scale is NOT ON")
-                        count+=1
-                        
+                        count += 1
                 else:
                     print(
                         "Timeout: No data received from scale. PLEASE TURN ON SCALE RECEIVER"
@@ -322,9 +322,8 @@ def scaleWeight():
                 break
             except Exception as e:
                 print(f"An error occurred: {e}")
-               
+                break
     return 0
-
 # Heartbeat Recive from location
 def heartbeat_recive(location):
     if testmode == 1 or testmode == 2:
@@ -384,26 +383,6 @@ def mill_recive():
         # serLoc.timeout = 0.1
         data_loc = serLoc.readline().decode().strip()
         return data_loc
-        serLoc.flush()
-        serLoc.reset_output_buffer()
-        serLoc.reset_input_buffer()
-        if data_loc == "+OK" or data_loc == "":
-            #If returning +Ok it could be the LoRa power cycling and might need the parameter rerun 
-            return ["error"]
-        print(f"THIS IS DATA RECEIVED ==>> {data_loc}")
-        data = (
-            data_loc.split(",")[2]
-            .replace("#", ",")
-            .replace(" : ", ",")
-            .replace("'", "")
-            .replace("{", "")
-            .replace("}", "")
-            .split(",")
-        )
-        type = data[1].strip()
-        mill = data[3].strip()
-        return [type, mill]
-
     except serial.SerialException as e:
         print(f"Location Serial Exception: {e} \ndata_loc: {data_loc}")
         return ["error"]
@@ -758,8 +737,7 @@ def OPCUA_Raw_weight(time, weight):
             print("Failed to disconnect from OPCUA", e)
 
 def call_back_timer():
-    print(f"CALL BACK TIMER!!!!!!! ========================================================================>>{last_known_location} --------------------------{type(last_known_location)}")
-    
+    print(f"CALL BACK TIMER!!!!!!! ==>> {last_known_location}")
     client = Client(OPCUA_Server_URL)
     client.connect()
     root = client.get_root_node()
@@ -797,7 +775,6 @@ def call_back_timer():
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
         print("VALUE SWITCHED TO NEGATIVE")
     return
-
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 #TODO CLOSE THE THREADS!!!!
 
@@ -921,12 +898,12 @@ def OPCUA_Location_Status(location, status):
                 except Exception as e:
                     print(f"Error updating {mill_name} Status to OPCUA: {e}")
             else:
-                last_known_location = location
                 print(f"NEW LOCATION ==>> {last_known_location}")
                 c_t1.start()
                 print("TIMER STARTED LOCATION IS DIFFERENT!!!")
                 print(f"Setting location!!!!!!!!!!!!!!! ==>> Previous location ==>> {last_known_location} New location ==>> {location}")
                 mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
+                last_known_location = location
     except Exception as e:
         print(f"OPCUA server not started\nError: {e}")
     finally:
@@ -1096,6 +1073,7 @@ def unloadStart(tag, sysno):
         print(f"Current Weight: {weight} kg")
 
         if inweight - weight >= MIN_WEIGHT_DROP:
+            print(f"inweight passed {inweight}")
             has_unloaded = True
         print(f"weight bufreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{weight_buffer}")
         if (has_unloaded and len(weight_buffer) == WEIGHT_BUFFER_COUNT and abs(weight - BUCKET_WEIGHT) <= MAX_RESIDUAL_WEIGHT):
@@ -1159,6 +1137,7 @@ def unloadStart(tag, sysno):
         connectionstatus = True
 
     if connectionstatus or testmode in (1, 2):
+        
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -1179,7 +1158,6 @@ def unloadStart(tag, sysno):
         print("Connection to AWS failed. Data saved to Backup file\n")
 
 def task1():
-
     print("Starting Task 1")
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop

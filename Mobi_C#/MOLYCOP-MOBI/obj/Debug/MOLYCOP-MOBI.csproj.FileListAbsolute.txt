@@ -1,0 +1,9 @@
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP-MOBI.csproj.AssemblyReference.cache
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP_MOBI.Properties.Resources.resources
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP-MOBI.csproj.GenerateResource.cache
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP-MOBI.csproj.CoreCompileInputs.cache
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\bin\Debug\MOLYCOP-MOBI.exe.config
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\bin\Debug\MOLYCOP-MOBI.exe
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\bin\Debug\MOLYCOP-MOBI.pdb
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP-MOBI.exe
+C:\Users\RileyHall\Documents\MolyCop\MOBi-Phase3\MOBi-Phase3\Mobi_C#\MOLYCOP-MOBI\obj\Debug\MOLYCOP-MOBI.pdb
