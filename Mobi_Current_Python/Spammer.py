@@ -54,6 +54,7 @@ def site_simulation_Mill0(ser : serial.Serial) -> None:
     data = f"{{'Type' : 'Location' # 'Value' : 0}}"
 
     while(True):
+        print(data )
         ser.write(f"AT+SEND=100,{len(data)},{data}\r\n".encode())
         time.sleep(1)
 
@@ -121,6 +122,6 @@ if __name__ == "__main__":
     #MILL1 TEST LOOP
     site_simulation_Mill0(ser)
     #MILL2 TEST LOOP
-    site_simulation_Mill2(ser)
+    # site_simulation_Mill2(ser)
 
     # test_loop(ser)

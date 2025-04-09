@@ -833,6 +833,7 @@ def OPCUA_Location_Status(location, status):
             try:
             
                 if(last_known_location == location):
+                    print("why nooooooooooooooooooooooooooooooooooooooooooooooooo")
                     if status == 0:
                         loading_vars["Loading Status"].set_value(
                             False, varianttype=ua.VariantType.Boolean
