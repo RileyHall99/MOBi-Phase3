@@ -382,6 +382,8 @@ def mill_recive():
         #Also changing so that the data is processed in another function to deal exit the threading.lock quickly 
         # serLoc.timeout = 0.1
         data_loc = serLoc.readline().decode().strip()
+        serLoc.reset_input_buffer()
+        serLoc.reset_output_buffer()
         return data_loc
     except serial.SerialException as e:
         print(f"Location Serial Exception: {e} \ndata_loc: {data_loc}")
@@ -834,7 +836,6 @@ def OPCUA_Location_Status(location, status):
                 else:
                     c_t1.start()
                     print("TIMER STARTED ")
-                    
                     if(last_known_location != "0"):
                         mill_name = f"Mill {last_known_location}"
                         mills_folder = objects.get_child(["2:Mills"])
