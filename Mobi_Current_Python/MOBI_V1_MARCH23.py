@@ -953,7 +953,7 @@ def loadingStart(sysno):
         #if the arrival wieght is greater than the current weight it means its getting loaded
         if (weight > Dweight):
             eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-            print(f"Loading at {eTime}, Weight: {weight} kg")
+            print(f"Loaded complete at {eTime}, Weight: {weight} kg")
             break
         else:
             print("Still at loading zone")
