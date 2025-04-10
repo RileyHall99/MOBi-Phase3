@@ -38,6 +38,7 @@ FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
 last_known_location : str = "0"
+location_status : bool = False
 last_qualified_weight = 0
 c_t1 = None
 
@@ -739,6 +740,8 @@ def OPCUA_Raw_weight(time, weight):
             print("Failed to disconnect from OPCUA", e)
 
 def call_back_timer():
+    global location_status
+    location_status = False
     print(f"CALL BACK TIMER!!!!!!! ==>> {last_known_location}")
     client = Client(OPCUA_Server_URL)
     client.connect()
@@ -783,6 +786,7 @@ def call_back_timer():
 def OPCUA_Location_Status(location, status):
     global last_known_location
     global c_t1
+    global location_status
     print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
@@ -800,6 +804,7 @@ def OPCUA_Location_Status(location, status):
             c_t1.cancel()
         c_t1 = Timer(15.0,call_back_timer )
         print("TIMER CREATED!!!!!")
+        location_status = True
         if location == "0": 
             
             loading_zone = objects.get_child(["2:Loading Zone"])
@@ -961,12 +966,15 @@ def loadingStart(sysno):
     leave_counter = 0
 
     # Initial location check
-    while True:
+    #INFO The Variable location_status is set to true when OPCUA_Location_Status is called and set to false when call_back_timer is called. 
+    #INFO The reason for this to to only track the load when it has left the location  
+    #INFO Logic ==>> Once the location_status variable changes to False it will leave the loop 
+    while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
         if data_loc[0] == "Location" and data_loc[1] == "0":
             OPCUA_Location_Status("0", 2)
-            break
+            # break
         elif data_loc[0] == "Heartbeat":
             heartbeat_recive(data_loc[1])
             OPCUA_Heartbeat(data_loc[1])
@@ -977,7 +985,7 @@ def loadingStart(sysno):
             if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
                 OPCUA_Location_Status(data_loc[1], 2)
             return
-
+    
     #it times out after 5 minute 
     while time.time() - start_time < TIMEOUT:
         weight = scaleWeight()
@@ -1080,13 +1088,13 @@ def unloadStart(tag, sysno):
     leave_counter = 0
 
     # Initial location check
-    while True:
+    while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
         print(f"THIS IS UNLOAD START ==>> {data_loc}")
         if data_loc[0] == "Location" and data_loc[1] == tag:  # Fixed condition
             OPCUA_Location_Status(tag, 2)
-            break
+            # break
         elif data_loc[0] == "Heartbeat":
             heartbeat_recive(data_loc[1])
             OPCUA_Heartbeat(data_loc[1])
@@ -1160,7 +1168,7 @@ def unloadStart(tag, sysno):
         "location": f"Mill {tag}",
         "systemno": sysno,
     }
-    
+    #AWS backup 
     if testmode == 0:
         client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
         connectionstatus = False
@@ -1171,7 +1179,7 @@ def unloadStart(tag, sysno):
             time.sleep(5)
     else:
         connectionstatus = True
-
+    #local backups of data 
     if connectionstatus or testmode in (1, 2):
         
         with open("location_data.csv", mode="a", newline="") as csv_file:
