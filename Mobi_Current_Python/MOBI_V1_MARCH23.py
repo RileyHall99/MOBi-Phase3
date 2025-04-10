@@ -740,7 +740,7 @@ def OPCUA_Raw_weight(time, weight):
         except Exception as e:
             print("Failed to disconnect from OPCUA", e)
 
-def call_back_timer():
+def call_back_timer(): 
     global location_status
     location_status = False
     print(f"CALL BACK TIMER!!!!!!! ==>> {last_known_location}")
@@ -773,14 +773,15 @@ def call_back_timer():
 
         if mill_folder is None:  # Handle case where mill is not found
             print(f"Error: Mill folder {mill_name} not found")
-            return
+            exit()
 
         mill_vars = {
             var.get_browse_name().Name: var for var in mill_folder.get_children()
         }
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
         print("VALUE SWITCHED TO NEGATIVE")
-    return
+    client.disconnect()
+        
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 #TODO CLOSE THE THREADS!!!!
 
@@ -1000,28 +1001,7 @@ def loadingStart(sysno):
         else:
             print("Still at loading zone")
             return
-               
-        # # Check if crane left the zone without loading
-        # data_loc = mill_recive()
-        # data_loc = process_input_data(data_loc)
-        # if data_loc[0] == "Location":
-        #     if data_loc[1] != "0":
-        #         leave_counter += 1
-        #         print(f"Scan {leave_counter}: Detected location {data_loc[1]}, expected Loading (0)")
-        #         if leave_counter >= 3:
-        #             print(f"Crane left Loading zone after 3 scans. Aborting.")
-        #             if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
-        #                 OPCUA_Location_Status(data_loc[1], 2)
-        #             return
-        #     else:
-        #         leave_counter = 0
-        #         OPCUA_Location_Status("0", 2)
-        # elif data_loc[0] == "Heartbeat":
-        #     heartbeat_recive(data_loc[1])
-        #     OPCUA_Heartbeat(data_loc[1])
-        # elif data_loc[0] == "error":
-        #     pass
-        # time.sleep(SLEEP_TIME)
+
 
     # Prepare and upload data
     data = {
@@ -1118,10 +1098,6 @@ def unloadStart(tag, sysno):
         else:
             print(f"Still unloading at mill {tag} ")
             return
-
-
-    
-
     # Prepare and upload data
     data = {
         "arrivetime": sTime,
@@ -1195,7 +1171,6 @@ def task1():
 
             
             continue
-
         elif data_type == "Location":
             if data_location == "0":
                 opcua_location = threading.Thread(target=OPCUA_Location_Status , args=("0" , 2))
