@@ -135,8 +135,8 @@ if __name__ == "__main__":
 
     #INFO How to run ==>> Comment one out and let it run.
     #MILL1 TEST LOOP
-    # site_simulation_Mill0(ser)
-    site_simulation_Mill1(ser)
+    site_simulation_Mill0(ser)
+    # site_simulation_Mill1(ser)
     #MILL2 TEST LOOP
     # site_simulation_Mill2(ser)
 

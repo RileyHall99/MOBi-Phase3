@@ -1,4 +1,11 @@
-﻿using System;
+﻿/*
+Scale Read 
+LoRa Read
+ */
+
+
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,8 +19,8 @@ namespace MOLYCOP_MOBI
     {
         String[] deviceNames;
         String[] ports;
-        String scalePort = "";
-        String LoRaPort = ""; 
+        SerialPort scalePort = null;
+        SerialPort LoRaPort = null; 
         public COMPORTS(String [] device_names) {
             this.deviceNames = device_names;
             this.ports = new string[device_names.Length];
@@ -21,8 +28,8 @@ namespace MOLYCOP_MOBI
 
         public COMPORTS(String s_port, String l_port)
         {
-            this.scalePort = s_port;
-            this.LoRaPort = l_port;
+            this.scalePort = new SerialPort(s_port , 9600 , Parity.None , 8 , StopBits.One);
+            this.LoRaPort = new SerialPort(l_port , 112500 , Parity.None, 8 , StopBits.One);
         }
 
         public void getPorts()
@@ -44,14 +51,25 @@ namespace MOLYCOP_MOBI
                         {
                             Console.WriteLine(device["Caption"].ToString());
                             //Add in device name for scale
-                            if (device["Caption"].ToString().Contains("Silicon Labs CP210x USB to UART Bridge") || device["Caption"].ToString().Contains(""))
+                            if (device["Caption"].ToString().Contains("Silicon Labs CP210x USB to UART Bridge") )
                             {
                                 Console.WriteLine("FOUND!!!!! ==>> " + port);
 
                                 results[index] = port;
-                                index++; 
-                                break;
+                                index++;
+                                this.LoRaPort = new SerialPort(port , 112500 , Parity.None , 8, StopBits.One);
+                           
                             }
+                            else if (device["Caption"].ToString().Contains(""))
+                            {
+                                this.scalePort = new SerialPort(port, 9600 , Parity.None , 8 , StopBits.One);
+                                results[index] = port;
+                                index++; 
+                             
+                            }
+
+
+
                         }
                     }; 
                     
@@ -63,6 +81,30 @@ namespace MOLYCOP_MOBI
             }
             this.ports = results;
 
+        }
+
+
+        private void LoRaDataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            Console.WriteLine(this.LoRaPort.ReadExisting()); 
+        }
+        public void LoRaReceive()
+        {
+            this.LoRaPort.DataReceived += new SerialDataReceivedEventHandler(LoRaDataReceived); 
+        }
+
+
+        private void scaleDataReceived(object sender, SerialDataReceivedEventArgs e) { 
+            Console.WriteLine(this.scalePort.ReadExisting());
+        }
+        public void scaleRecieve()
+        {
+            this.scalePort.DataReceived += new SerialDataReceivedEventHandler(scaleDataReceived);
+        }
+
+        public void LoRaTransmit(String msg)
+        {
+            this.LoRaPort.Write(msg);
         }
     }
 }
