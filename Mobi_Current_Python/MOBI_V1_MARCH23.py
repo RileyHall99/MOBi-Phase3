@@ -382,7 +382,7 @@ def mill_recive():
     try:
         #Change 2 readline waits until there is a new line character read in. So if that never comes it can take a while for it to finish
         #Also changing so that the data is processed in another function to deal exit the threading.lock quickly 
-        serLoc.timeout = 0.9
+        serLoc.timeout = 2
         data_loc = serLoc.readline().decode().strip()
         serLoc.reset_input_buffer()
         serLoc.reset_output_buffer()
@@ -804,7 +804,7 @@ def OPCUA_Location_Status(location, status):
         objects = root.get_children()[0]
         if(c_t1 is not None):
             c_t1.cancel()
-        c_t1 = Timer(15.0,call_back_timer )
+        c_t1 = Timer(20.0,call_back_timer )
         print("TIMER CREATED!!!!!")
         location_status = True
         if location == "0": 
@@ -997,7 +997,12 @@ def loadingStart(sysno):
     else:
         if (weight > Dweight):
             eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+            print("\n---------------------------------------------------------")
+            print(f"Here is the last weight={weight}")
+            print(f"Here is the inweight={inweight}")
+            print(f"substraction={(weight-inweight)}")
             print(f"Loading complete at {eTime}, Weight: {weight-inweight} kg")
+            print("---------------------------------------------------------\n")
             
         else:
             print("Still at loading zone")
@@ -1094,7 +1099,13 @@ def unloadStart(tag, sysno):
     else:
         if (Dweight > weight):
             eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+            print("\n---------------------------------------------------------")
+            print(f"Here is the last weight={weight}")
+            print(f"Here is the inweight={inweight}")
+            print(f"substraction={(weight-inweight)}")
             print(f"unLoaded complete at {eTime}, Weight: {(inweight-weight)} kg")
+            print("---------------------------------------------------------\n")
+            
             
         else:
             print(f"Still unloading at mill {tag} ")
@@ -1143,6 +1154,8 @@ def unloadStart(tag, sysno):
 
 def task1():
     print("Starting Task 1")
+    print("Resetting values to false")
+    on_start()
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         response = None
@@ -1278,13 +1291,11 @@ def on_start():
     client = Client(OPCUA_Server_URL)
     client.connect()
     root = client.get_root_node()
-    objects = root.get_children[0]
+    objects = root.get_children()[0]
 
     #Switch Loading Zone to false on start
     loading_zone = objects.get_child(["2:Loading Zone"])
-    loading = loading_zone.get_children()[
-        0
-    ]  # Get the Loading folder inside Loading Zone
+    loading = loading_zone.get_children()[0]  # Get the Loading folder inside Loading Zone
     loading_vars = {
         var.get_browse_name().Name: var for var in loading.get_children()
     }
@@ -1297,7 +1308,7 @@ def on_start():
     mills_folder = objects.get_child(["2:Mills"])
     mill_folder = None
 
-    for i in range(6):
+    for i in range(1,6):
         try:
             mill_name = f"Mill {i}"
             for child in mills_folder.get_children():
@@ -1310,6 +1321,7 @@ def on_start():
             mill_vars[f"{mill_name} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
         except Exception as e:
             print(f"There seems to be an error with on_start ==>> {e.args[0]}")
+    client.disconnect()
 
 
 
