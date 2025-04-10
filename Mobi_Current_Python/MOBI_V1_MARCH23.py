@@ -382,7 +382,7 @@ def mill_recive():
     try:
         #Change 2 readline waits until there is a new line character read in. So if that never comes it can take a while for it to finish
         #Also changing so that the data is processed in another function to deal exit the threading.lock quickly 
-        # serLoc.timeout = 0.1
+        serLoc.timeout = 0.9
         data_loc = serLoc.readline().decode().strip()
         serLoc.reset_input_buffer()
         serLoc.reset_output_buffer()
@@ -983,6 +983,7 @@ def loadingStart(sysno):
             if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
                 OPCUA_Location_Status(data_loc[1], 2)
             return
+        print("End of While Statement in loading start")
     
 
     weight = scaleWeight()
