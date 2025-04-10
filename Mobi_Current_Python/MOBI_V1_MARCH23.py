@@ -383,7 +383,8 @@ def mill_recive():
         # serLoc.timeout = 0.1
         data_loc = serLoc.readline().decode().strip()
         serLoc.reset_input_buffer()
-        serLoc.reset_output_buffer()
+        serLoc.rese
+        t_output_buffer()
         return data_loc
     except serial.SerialException as e:
         print(f"Location Serial Exception: {e} \ndata_loc: {data_loc}")
@@ -987,12 +988,16 @@ def loadingStart(sysno):
         Dweight = inweight * 1.10
         
         #if the arrival wieght is greater than the current weight it means its getting loaded
-        if (weight > Dweight):
-            eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-            print(f"Loaded complete at {eTime}, Weight: {weight} kg")
+        if(inweight < 0 ):
+            print("Scale is not zeroed")    
             break
         else:
-            print("Still at loading zone")
+            if (weight > Dweight):
+                eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+                print(f"Loaded complete at {eTime}, Weight: {weight} kg")
+                break
+            else:
+                print("Still at loading zone")
             
             
             
@@ -1102,24 +1107,23 @@ def unloadStart(tag, sysno):
     has_unloaded = False
     while time.time() - start_time < TIMEOUT:
         weight = scaleWeight()
-        weight_buffer.append(weight)
-        if len(weight_buffer) > WEIGHT_BUFFER_COUNT:
-            weight_buffer.pop(0)
-
+        
         print(f"Current Weight: {weight} kg")
-
-        if inweight - weight >= MIN_WEIGHT_DROP:
-            print(f"inweight passed {inweight}")
-            has_unloaded = True
-        print(f"weight bufreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{weight_buffer}")
-        if (has_unloaded and len(weight_buffer) == WEIGHT_BUFFER_COUNT and abs(weight - BUCKET_WEIGHT) <= MAX_RESIDUAL_WEIGHT):
-            avg = sum(weight_buffer) / WEIGHT_BUFFER_COUNT
-            variance = sum((w - avg) ** 2 for w in weight_buffer) / WEIGHT_BUFFER_COUNT
-            print(f"HEre is the variance {variance}--------------------------------------------------------------------------------------------------------------------------------")
-            if variance < STABILITY_VARIANCE:
+                
+         # variable to signifiy 10 less wieght on the bucket
+        Dweight = inweight * .9
+        
+        #if the arrival weight is less than the leave weight then a unload is counted
+        if(inweight < 0 ):
+            print("Issue with scala wight is less tha 0")    
+            break
+        else:
+            if (Dweight < weight):
                 eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-                print(f"Unloading complete at {eTime}, Weight: {weight} kg")
+                print(f"Loaded complete at {eTime}, Weight: {weight} kg")
                 break
+            else:
+                print(f"Still unloading at mill {tag} ")
 
         # Check if crane left the zone without unloading
         data_loc = mill_recive()
