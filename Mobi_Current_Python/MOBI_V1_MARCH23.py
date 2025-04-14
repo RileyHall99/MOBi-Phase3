@@ -952,21 +952,13 @@ def OPCUA_Location_Status(location, status):
             print("Failed to disconnect from OPCUA", e)
 
 
-def AWS_upload(stime, etime, inweight, weight, location, systemno):
+def AWS_upload(data , etime , weight):
     
     if(location == 0):
         location = "Loading"
     else:
         f"Mill {location}"
 
-    data = {
-        "arrivetime": stime,
-        "leavetime": etime,
-        "inweight": inweight,
-        "outweight": weight,
-        "location": location,
-        "systemno": sysno,
-    }
 
     if testmode == 0:
         client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
@@ -979,25 +971,6 @@ def AWS_upload(stime, etime, inweight, weight, location, systemno):
     else:
         connectionstatus = True
 
-    if connectionstatus or testmode in (1, 2):
-        with open("location_data.csv", mode="a", newline="") as csv_file:
-            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            if csv_file.tell() == 0:
-                writer.writeheader()
-            writer.writerow(data)
-        #uploading net weight into leave weight at loading
-        status = OPCUA_Upload("0", etime, (weight-inweight), stime, inweight)
-        print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-        print("Loading Complete\n")
-    else:
-        with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
-            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            if csv_file.tell() == 0:
-                writer.writeheader()
-            writer.writerow(data)
-        print("Connection to AWS failed. Data saved to Backup file\n")
 
 # Loading location fill up logic
 def loadingStart(sysno):
@@ -1061,9 +1034,38 @@ def loadingStart(sysno):
         else:
             print("Still at loading zone")
             return
-
-    cloud_upload = threading.Thread(target=AWS_upload , args=(sTime , eTime, inweight , weight, 0 , sysno , ))
+    data = {
+        "arrivetime": sTime,
+        "leavetime": eTime,
+        "inweight": inweight,
+        "outweight": weight,
+        "location": "Loading",
+        "systemno": sysno,
+    }
+    cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight ))
     cloud_upload.start()
+
+
+    
+    if testmode in ( 0 , 1, 2):
+        with open("location_data.csv", mode="a", newline="") as csv_file:
+            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if csv_file.tell() == 0:
+                writer.writeheader()
+            writer.writerow(data)
+        #uploading net weight into leave weight at loading
+        status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
+        print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+        print("Loading Complete\n")
+    else:
+        with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
+            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if csv_file.tell() == 0:
+                writer.writeheader()
+            writer.writerow(data)
+        print("Connection to AWS failed. Data saved to Backup file\n")
     # Prepare and upload data
     
     # data = {
@@ -1148,9 +1150,39 @@ def unloadStart(tag, sysno):
         else:
             print(f"Still unloading at mill {tag} ")
             return
+    data = {
+        "arrivetime": sTime,
+        "leavetime": eTime,
+        "inweight": inweight,
+        "outweight": weight,
+        "location": f"Mill {tag}",
+        "systemno": sysno,
+    }
     # Prepare and upload data
-    cloud_upload = threading.Thread(target=AWS_upload , args=(sTime , eTime , inweight , weight,  tag , sysno , ))
+    cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight))
     cloud_upload.start()
+
+
+    
+    if testmode in ( 0 , 1, 2):
+        with open("location_data.csv", mode="a", newline="") as csv_file:
+            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if csv_file.tell() == 0:
+                writer.writeheader()
+            writer.writerow(data)
+        #uploading net weight into leave weight at loading
+        status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
+        print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+        print("Loading Complete\n")
+    else:
+        with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
+            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if csv_file.tell() == 0:
+                writer.writeheader()
+            writer.writerow(data)
+        print("Connection to AWS failed. Data saved to Backup file\n")
     # data = {
     #     "arrivetime": sTime,
     #     "leavetime": eTime,
