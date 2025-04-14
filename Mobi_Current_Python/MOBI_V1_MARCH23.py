@@ -31,7 +31,6 @@ from threading import Timer
 baudrate_scale = 9600
 baudrate_loc = 115200
 
-# Change to PC ports
 
 
 FORMAT = r"^(\-?\d+\.?\d*)"
@@ -39,7 +38,7 @@ SLEEP_TIME = 1
 
 last_known_location : str = "0"
 location_status : bool = False
-last_qualified_weight = 0
+first_load : bool = False
 c_t1 = None
 
 def get_correct_ports()-> list: 
@@ -788,7 +787,6 @@ def call_back_timer():
 def OPCUA_Location_Status(location, status):
     global last_known_location
     global c_t1
-    global location_status
     print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
@@ -806,7 +804,6 @@ def OPCUA_Location_Status(location, status):
             c_t1.cancel()
         c_t1 = Timer(20.0,call_back_timer )
         print("TIMER CREATED!!!!!")
-        location_status = True
         if location == "0": 
             
             loading_zone = objects.get_child(["2:Loading Zone"])
@@ -958,10 +955,19 @@ def OPCUA_Location_Status(location, status):
 def loadingStart(sysno):
     print("STARTING LOADING")
     global location_status
+    global first_load
     heartbeat_recive("0")
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Loading at {sTime}\n")
-    inweight = scaleWeight()
+    
+    if(first_load):
+        inweight = 1.3 #Chnage for HVC to 1510
+        first_load = False
+    else:
+        inweight = scaleWeight()
+        
+    print(f"Location status {location_status}------------------------------------------------")
+        
     # Initial location check
     #INFO The Variable location_status is set to true when OPCUA_Location_Status is called and set to false when call_back_timer is called. 
     #INFO The reason for this to to only track the load when it has left the location  
@@ -1156,6 +1162,7 @@ def task1():
     print("Starting Task 1")
     print("Resetting values to false")
     on_start()
+    global location_status
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         response = None
@@ -1186,6 +1193,7 @@ def task1():
             
             continue
         elif data_type == "Location":
+            location_status = True
             if data_location == "0":
                 opcua_location = threading.Thread(target=OPCUA_Location_Status , args=("0" , 2))
                 opcua_location.start()
@@ -1292,6 +1300,8 @@ def on_start():
     client.connect()
     root = client.get_root_node()
     objects = root.get_children()[0]
+    global first_load
+    first_load = True
 
     #Switch Loading Zone to false on start
     loading_zone = objects.get_child(["2:Loading Zone"])
@@ -1322,6 +1332,7 @@ def on_start():
         except Exception as e:
             print(f"There seems to be an error with on_start ==>> {e.args[0]}")
     client.disconnect()
+    print("Finished setup-----------------------------------------------")
 
 
 
