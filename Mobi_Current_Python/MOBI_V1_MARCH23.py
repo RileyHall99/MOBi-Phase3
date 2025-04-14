@@ -345,6 +345,7 @@ def heartbeat_recive(location):
     except Exception as e:  # Catch other potential exceptions during publishing
         print(f"An error occurred: {e}")
         print("Heartbeat Recived but not sent\n")
+    
 
 def process_input_data(data_loc : str):
     print(f"PROCESSING DATA ==>> {data_loc}")
@@ -409,7 +410,7 @@ def Connection_Verification(location, Leavetime, outweight):
         response = requests.post(
             location_api_url, headers=headers, data=json.dumps(payload)
         )
-
+        print(f"RESPONSE STATUS ==>> {response.status_code} RESPONSE MESSAGE ==>> {response.json()}")
         # Check if the request was successful
         if response.status_code == 200:
             # Parse the JSON response
@@ -954,17 +955,17 @@ def OPCUA_Location_Status(location, status):
 
 def AWS_upload(data , etime , weight):
     
-    if(location == 0):
-        location = "Loading"
-    else:
-        f"Mill {location}"
-
-
+    print(f"DATA ==>> {data}")
     if testmode == 0:
         client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+        print(f"IS CONNECTED?????? ==>> {client.is_connected()}")
         connectionstatus = False
         for i in range(3):
-            connectionstatus = Connection_Verification("Loading", etime, weight)
+            if(data['location'] == "Loading"):
+                connectionstatus = Connection_Verification("Loading", data['leavetime'], data['outweight'])
+            else:
+                connectionstatus = Connection_Verification(data['location'], data['leavetime'], data['outweight'])
+                
             if connectionstatus:
                 break
             time.sleep(5)
@@ -1042,8 +1043,9 @@ def loadingStart(sysno):
         "location": "Loading",
         "systemno": sysno,
     }
-    cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight ))
-    cloud_upload.start()
+    if (testmode == 0):
+        cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight,))
+        cloud_upload.start()
 
 
     
@@ -1087,6 +1089,7 @@ def loadingStart(sysno):
     #         time.sleep(5)
     # else:
     #     connectionstatus = True
+    cloud_upload.join()
 
 
 
@@ -1159,11 +1162,9 @@ def unloadStart(tag, sysno):
         "systemno": sysno,
     }
     # Prepare and upload data
-    cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight))
+    cloud_upload = threading.Thread(target=AWS_upload , args=(data , eTime , weight,))
     cloud_upload.start()
 
-
-    
     if testmode in ( 0 , 1, 2):
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
@@ -1172,9 +1173,9 @@ def unloadStart(tag, sysno):
                 writer.writeheader()
             writer.writerow(data)
         #uploading net weight into leave weight at loading
-        status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
+        status = OPCUA_Upload(tag, eTime, weight, sTime, (inweight-weight))
         print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-        print("Loading Complete\n")
+        print("Unloading Complete\n")
     else:
         with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
@@ -1223,6 +1224,7 @@ def unloadStart(tag, sysno):
     #             writer.writeheader()
     #         writer.writerow(data)
     #     print("Connection to AWS failed. Data saved to Backup file\n")
+    
 
 def task1():
     print("Starting Task 1")
