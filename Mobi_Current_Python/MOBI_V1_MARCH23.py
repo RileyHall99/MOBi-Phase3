@@ -202,7 +202,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 # 0 = Production mode
 # 1 = test mode By pass AWS / internet connection but still send to OPCUA
 # 2 = test mode By pass AWS / internet connection and bypass OPCUA
-testmode = 1
+testmode = 0
 
 is_connected_internet_AWS = False
 
