@@ -38,6 +38,7 @@ FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
 
 last_known_location : str = "0"
+location_status : bool = False
 last_qualified_weight = 0
 c_t1 = None
 
@@ -297,7 +298,7 @@ def scaleWeight():
             try:
                 serScale.timeout = 2  # Set a 1-second timeout
                 serScale.reset_input_buffer()
-                t2 = time.time()
+                
                 data_scale = (
                     serScale.readline().decode("utf-8", errors="ignore").strip()
                 )
@@ -306,6 +307,7 @@ def scaleWeight():
                 if data_scale:
                     match = re.search(FORMAT, data_scale)
                     if match:
+                        t2 = time.time()
                         weight = float(match.group(1))
                         return weight
                     else:
@@ -380,7 +382,7 @@ def mill_recive():
     try:
         #Change 2 readline waits until there is a new line character read in. So if that never comes it can take a while for it to finish
         #Also changing so that the data is processed in another function to deal exit the threading.lock quickly 
-        # serLoc.timeout = 0.1
+        serLoc.timeout = 2
         data_loc = serLoc.readline().decode().strip()
         serLoc.reset_input_buffer()
         serLoc.reset_output_buffer()
@@ -738,7 +740,9 @@ def OPCUA_Raw_weight(time, weight):
         except Exception as e:
             print("Failed to disconnect from OPCUA", e)
 
-def call_back_timer():
+def call_back_timer(): 
+    global location_status
+    location_status = False
     print(f"CALL BACK TIMER!!!!!!! ==>> {last_known_location}")
     client = Client(OPCUA_Server_URL)
     client.connect()
@@ -769,20 +773,22 @@ def call_back_timer():
 
         if mill_folder is None:  # Handle case where mill is not found
             print(f"Error: Mill folder {mill_name} not found")
-            return
+            exit()
 
         mill_vars = {
             var.get_browse_name().Name: var for var in mill_folder.get_children()
         }
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
         print("VALUE SWITCHED TO NEGATIVE")
-    return
+    client.disconnect()
+        
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
 #TODO CLOSE THE THREADS!!!!
 
 def OPCUA_Location_Status(location, status):
     global last_known_location
     global c_t1
+    global location_status
     print(f"SETTING LOCATION STATUS {location}")
     if testmode == 1:
         pass
@@ -798,8 +804,9 @@ def OPCUA_Location_Status(location, status):
         objects = root.get_children()[0]
         if(c_t1 is not None):
             c_t1.cancel()
-        c_t1 = Timer(15.0,call_back_timer )
+        c_t1 = Timer(20.0,call_back_timer )
         print("TIMER CREATED!!!!!")
+        location_status = True
         if location == "0": 
             
             loading_zone = objects.get_child(["2:Loading Zone"])
@@ -812,7 +819,6 @@ def OPCUA_Location_Status(location, status):
             try:
             
                 if(last_known_location == location):
-                    print("why nooooooooooooooooooooooooooooooooooooooooooooooooo")
                     if status == 0:
                         loading_vars["Loading Status"].set_value(
                             False, varianttype=ua.VariantType.Boolean
@@ -951,22 +957,22 @@ def OPCUA_Location_Status(location, status):
 # Loading location fill up logic
 def loadingStart(sysno):
     print("STARTING LOADING")
+    global location_status
     heartbeat_recive("0")
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Loading at {sTime}\n")
     inweight = scaleWeight()
-
-    # Buffer for stability check (5 seconds)
-    start_time = time.time()
-    leave_counter = 0
-
     # Initial location check
-    while True:
+    #INFO The Variable location_status is set to true when OPCUA_Location_Status is called and set to false when call_back_timer is called. 
+    #INFO The reason for this to to only track the load when it has left the location  
+    #INFO Logic ==>> Once the location_status variable changes to False it will leave the loop 
+    while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
+        print(f"Location status thingy  {location_status} ------------------------------------------------")
         if data_loc[0] == "Location" and data_loc[1] == "0":
             OPCUA_Location_Status("0", 2)
-            break
+            # break
         elif data_loc[0] == "Heartbeat":
             heartbeat_recive(data_loc[1])
             OPCUA_Heartbeat(data_loc[1])
@@ -977,50 +983,31 @@ def loadingStart(sysno):
             if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
                 OPCUA_Location_Status(data_loc[1], 2)
             return
+        print("End of While Statement in loading start")
+    
 
-    #it times out after 5 minute 
-    while time.time() - start_time < TIMEOUT:
-        weight = scaleWeight()
-        print(f"Current Weight: {weight} kg")
+    weight = scaleWeight()
+    print(f"Current Weight: {weight} kg")
+    # variable to signifiy 10 less wieght on the bucket
+    Dweight = inweight * 1.10
+    #if the arrival wieght is greater than the current weight it means its getting loaded
+    if(inweight < 0 ):
+        print("Scale is not zeroed")    
 
-        # variable to signifiy 10 less wieght on the bucket
-        Dweight = inweight * 1.10
-        
-        #if the arrival wieght is greater than the current weight it means its getting loaded
+    else:
         if (weight > Dweight):
             eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-            print(f"Loaded complete at {eTime}, Weight: {weight} kg")
-            break
+            print("\n---------------------------------------------------------")
+            print(f"Here is the last weight={weight}")
+            print(f"Here is the inweight={inweight}")
+            print(f"substraction={(weight-inweight)}")
+            print(f"Loading complete at {eTime}, Weight: {weight-inweight} kg")
+            print("---------------------------------------------------------\n")
+            
         else:
             print("Still at loading zone")
-            
-            
-            
-        # Check if crane left the zone without loading
-        data_loc = mill_recive()
-        data_loc = process_input_data(data_loc)
-        if data_loc[0] == "Location":
-            if data_loc[1] != "0":
-                leave_counter += 1
-                print(f"Scan {leave_counter}: Detected location {data_loc[1]}, expected Loading (0)")
-                if leave_counter >= 3:
-                    print(f"Crane left Loading zone after 3 scans. Aborting.")
-                    if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
-                        OPCUA_Location_Status(data_loc[1], 2)
-                    return
-            else:
-                leave_counter = 0
-                OPCUA_Location_Status("0", 2)
-        elif data_loc[0] == "Heartbeat":
-            heartbeat_recive(data_loc[1])
-            OPCUA_Heartbeat(data_loc[1])
-        elif data_loc[0] == "error":
-            pass
-        time.sleep(SLEEP_TIME)
-    
-    else:
-        print("Loading timeout exceeded after 5 minutes.")
-        return
+            return
+
 
     # Prepare and upload data
     data = {
@@ -1050,8 +1037,8 @@ def loadingStart(sysno):
             if csv_file.tell() == 0:
                 writer.writeheader()
             writer.writerow(data)
-
-        status = OPCUA_Upload("0", eTime, weight, sTime, inweight)
+        #uploading net weight into leave weight at loading
+        status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
         print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
         print("Loading Complete\n")
     else:
@@ -1066,13 +1053,10 @@ def loadingStart(sysno):
 # start unload process
 def unloadStart(tag, sysno):
     heartbeat_recive(str(tag))
+    global location_status
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Monitoring for Mill {tag} at {sTime}\n")
     inweight = scaleWeight()
-
-    if inweight <= BUCKET_WEIGHT + MIN_MATERIAL_WEIGHT:
-        print(f"Weight too low to start unloading: {inweight} kg < {BUCKET_WEIGHT + MIN_MATERIAL_WEIGHT} kg")
-        return
 
     # Buffer for stability check (5 seconds)
     weight_buffer = []
@@ -1080,13 +1064,13 @@ def unloadStart(tag, sysno):
     leave_counter = 0
 
     # Initial location check
-    while True:
+    while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
         print(f"THIS IS UNLOAD START ==>> {data_loc}")
         if data_loc[0] == "Location" and data_loc[1] == tag:  # Fixed condition
             OPCUA_Location_Status(tag, 2)
-            break
+            # break
         elif data_loc[0] == "Heartbeat":
             heartbeat_recive(data_loc[1])
             OPCUA_Heartbeat(data_loc[1])
@@ -1099,58 +1083,33 @@ def unloadStart(tag, sysno):
             return
 
     # Monitor weight for unloading
-    has_unloaded = False
-    while time.time() - start_time < TIMEOUT:
-        weight = scaleWeight()
-        weight_buffer.append(weight)
-        if len(weight_buffer) > WEIGHT_BUFFER_COUNT:
-            weight_buffer.pop(0)
-
-        print(f"Current Weight: {weight} kg")
-
-        if inweight - weight >= MIN_WEIGHT_DROP:
-            print(f"inweight passed {inweight}")
-            has_unloaded = True
-        print(f"weight bufreeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{weight_buffer}")
-        if (has_unloaded and len(weight_buffer) == WEIGHT_BUFFER_COUNT and abs(weight - BUCKET_WEIGHT) <= MAX_RESIDUAL_WEIGHT):
-            avg = sum(weight_buffer) / WEIGHT_BUFFER_COUNT
-            variance = sum((w - avg) ** 2 for w in weight_buffer) / WEIGHT_BUFFER_COUNT
-            print(f"HEre is the variance {variance}--------------------------------------------------------------------------------------------------------------------------------")
-            if variance < STABILITY_VARIANCE:
-                eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-                print(f"Unloading complete at {eTime}, Weight: {weight} kg")
-                break
-
-        # Check if crane left the zone without unloading
-        data_loc = mill_recive()
-        data_loc = process_input_data(data_loc)
-        if data_loc[0] == "Location":
-            if data_loc[1] != tag:
-                leave_counter += 1
-                print(f"Scan {leave_counter}: Detected location {data_loc[1]}, expected Mill {tag}")
-                if leave_counter >= 3:
-                    print(f"Crane left Mill {tag} without unloading after 3 scans. Aborting.")
-                    if data_loc[1] in ["0", "1", "2", "3", "4", "5", "6"]:
-                        OPCUA_Location_Status(data_loc[1], 2)
-                    return
-            else:
-                leave_counter = 0
-                OPCUA_Location_Status(data_loc[1],2)
-        elif data_loc[0] == "Heartbeat":
-            heartbeat_recive(data_loc[1])
-            OPCUA_Heartbeat(data_loc[1])
-        elif data_loc[0] == "error":
-            pass
-        time.sleep(SLEEP_TIME)
+    print("Ater call back timer loop=----------------------------------")
     
+    weight = scaleWeight()
+    
+    print(f"Current Weight: {weight} kg")
+            
+        # variable to signifiy 10 less wieght on the bucket
+    Dweight = inweight * .9
+    
+    #if the arrival weight is less than the leave weight then a unload is counted
+    if(inweight < 0 ):
+        print("Issue with scala wight is less tha 0")    
+        
     else:
-        print("Unloading timeout exceeded after 5 minutes.")
-        return
-
-    if not has_unloaded:
-        print("No significant weight drop detected. Likely a pass-through.")
-        return
-
+        if (Dweight > weight):
+            eTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+            print("\n---------------------------------------------------------")
+            print(f"Here is the last weight={weight}")
+            print(f"Here is the inweight={inweight}")
+            print(f"substraction={(weight-inweight)}")
+            print(f"unLoaded complete at {eTime}, Weight: {(inweight-weight)} kg")
+            print("---------------------------------------------------------\n")
+            
+            
+        else:
+            print(f"Still unloading at mill {tag} ")
+            return
     # Prepare and upload data
     data = {
         "arrivetime": sTime,
@@ -1160,7 +1119,7 @@ def unloadStart(tag, sysno):
         "location": f"Mill {tag}",
         "systemno": sysno,
     }
-    
+    #AWS backup 
     if testmode == 0:
         client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
         connectionstatus = False
@@ -1171,7 +1130,7 @@ def unloadStart(tag, sysno):
             time.sleep(5)
     else:
         connectionstatus = True
-
+    #local backups of data 
     if connectionstatus or testmode in (1, 2):
         
         with open("location_data.csv", mode="a", newline="") as csv_file:
@@ -1180,8 +1139,8 @@ def unloadStart(tag, sysno):
             if csv_file.tell() == 0:
                 writer.writeheader()
             writer.writerow(data)
-
-        status = OPCUA_Upload(tag, eTime, weight, sTime, inweight)
+        #upload net weight into arrival weight
+        status = OPCUA_Upload(tag, eTime, weight, sTime, (inweight-weight))
         print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
         print("Unloading Complete\n")
     else:
@@ -1195,6 +1154,8 @@ def unloadStart(tag, sysno):
 
 def task1():
     print("Starting Task 1")
+    print("Resetting values to false")
+    on_start()
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         response = None
@@ -1224,23 +1185,19 @@ def task1():
 
             
             continue
-
         elif data_type == "Location":
             if data_location == "0":
                 opcua_location = threading.Thread(target=OPCUA_Location_Status , args=("0" , 2))
                 opcua_location.start()
                 # OPCUA_Location_Status("0", 2)
                 weight = scaleWeight()
-                if weight <= BUCKET_WEIGHT:  
+                
                     #OPCUA_Location_Status("0", 1)
-                    loadingStart("1")
-                else:
+                loadingStart("1")
+
                     # heartbeat_recive(data_location)
-                    heart_thread.start()
-                    print(
-                        f"Current scale Weight: {weight} \nBucket is still at Loading zone with a load or the bucket is not zeroed\n"
-                    )
-                    continue
+                heart_thread.start()
+                    
             elif data_location in ("1", "2", "3", "4", "5", "6"):
                 opcua_location = threading.Thread(target=OPCUA_Location_Status , args=(data_location , 2))
                 opcua_location.start()
@@ -1334,13 +1291,11 @@ def on_start():
     client = Client(OPCUA_Server_URL)
     client.connect()
     root = client.get_root_node()
-    objects = root.get_children[0]
+    objects = root.get_children()[0]
 
     #Switch Loading Zone to false on start
     loading_zone = objects.get_child(["2:Loading Zone"])
-    loading = loading_zone.get_children()[
-        0
-    ]  # Get the Loading folder inside Loading Zone
+    loading = loading_zone.get_children()[0]  # Get the Loading folder inside Loading Zone
     loading_vars = {
         var.get_browse_name().Name: var for var in loading.get_children()
     }
@@ -1353,7 +1308,7 @@ def on_start():
     mills_folder = objects.get_child(["2:Mills"])
     mill_folder = None
 
-    for i in range(6):
+    for i in range(1,6):
         try:
             mill_name = f"Mill {i}"
             for child in mills_folder.get_children():
@@ -1366,6 +1321,7 @@ def on_start():
             mill_vars[f"{mill_name} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
         except Exception as e:
             print(f"There seems to be an error with on_start ==>> {e.args[0]}")
+    client.disconnect()
 
 
 
