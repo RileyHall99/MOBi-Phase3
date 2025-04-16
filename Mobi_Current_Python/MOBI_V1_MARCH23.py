@@ -199,8 +199,12 @@ stop_threads = False
 def on_connect(client, userdata, flags, rc, properties=None):
     print("Connected to AWS IoT: " + str(rc))
 
+def on_publish(client, userdata, mid):
+    print(f"[MQTT] Message {mid} published.")
+
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
+client.on_publish = on_publish
 
 # Verify certificate files exist
 cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
@@ -226,14 +230,16 @@ is_connected_internet_AWS = False
 
 def connect_to_AWS():
     # Connect to AWS IoT with 3 retries
+    global is_connected_internet_AWS
     num_retries = 3
     for attempt in range(1, num_retries + 1):
         try:
             msg = client.connect(Mqtt_host, 8883, 60)
             client.loop_start()
-            is_connected_internet_AWS = True
             if msg == 0:
                 print("AWS Connection established.")
+                is_connected_internet_AWS = True
+
                 break  # Exit the loop on successful connection
             else:
                 print("Connection attempt", attempt, "failed:", msg)
@@ -1290,6 +1296,7 @@ def task2():
 # PC OPCUA Heartbeat
 def task3():
     print("Starting Task 3")
+    global is_connected_internet_AWS
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         try:
@@ -1326,7 +1333,7 @@ def task3():
 
                     #push to AWS
                     try:
-                        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=1, retain=False)
                     
                     except Exception as e:
                         print(f"exception:--------=--------------{e}") 
@@ -1344,7 +1351,6 @@ def task3():
                 file.seek(0)
                 file.truncate()
                 file.close()
-           
 
 
         time.sleep(120)
