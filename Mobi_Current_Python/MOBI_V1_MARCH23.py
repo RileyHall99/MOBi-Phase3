@@ -1331,8 +1331,6 @@ def task3():
                     except Exception as e:
                         print(f"exception:--------=--------------{e}") 
                 
-                    client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-                    connectionstatus = False
                     for i in range(3):
                         print(f"try: {i}")
                         connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
