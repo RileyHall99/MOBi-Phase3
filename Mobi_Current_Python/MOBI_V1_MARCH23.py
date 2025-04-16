@@ -1298,34 +1298,8 @@ def task3():
             print(f"Error in task3 OPCUA_Heartbeat : {e}")
         heartbeat_recive("7")
         check_network_connection()
-        
-        # if(aws_data_upload_queue and is_connected_internet_AWS):
-        #     print(f"DATA IN QUEUE ==>> {aws_data_upload_queue}")
-        #     for entry in aws_data_upload_queue:
-        #         client.publish("raspi/mobi_loc", payload=json.dumps(entry), qos=0, retain=False)
-        #         connectionstatus = False
-        #         for i in range(3):
-        #             mill_name = ""
-        #             if(entry['location'] != "Loading"):
-        #                 mill_name = "Loading"
-        #             else:
-        #                 mill_name = f"Mill {entry['location']}"
-        #             connectionstatus = Connection_Verification(mill_name, entry['leavetime'], entry["outweight"])
-        #             if connectionstatus:
-        #                 break
-        #             time.sleep(5)
-    #     data = {
-    #         "arrivetime": sTime,
-    #         "leavetime": eTime,
-    #         "inweight": (inweight-weight),
-    #         "outweight": weight,
-    #         "location": f"Mill {tag}",
-    #         "systemno": sysno,
-    # }
-    #updated code somethings switched. Checks if we have data then updates both AWS and OPCUA 
 
         if(is_connected_internet_AWS):
-            print("---------------------------------------------------------------------------")
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
                 next(csvFile)
@@ -1349,16 +1323,14 @@ def task3():
                         "location" : aws_name,
                         "systemno" : lines[5]
                     }
+
                     #push to AWS
-                    info = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-                    info.wait_for_publish(3)
+                    try:
+                        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
                     
-                    print(f"INFORMATION: {info.rc}-------------\n")
-                    connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
-                    print(f"status:{connectionstatus}")
-                    
-                    
-                    check_network_connection()
+                    except Exception as e:
+                        print(f"exception:--------=--------------{e}") 
+                
                     client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
                     connectionstatus = False
                     for i in range(3):
@@ -1367,15 +1339,14 @@ def task3():
                         if connectionstatus:
                             break
                         time.sleep(5)
-                        print("End of sleep 5 ---------------------------------------")
-                        
                     #push to OPCUA 
                     status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-                    print("---------------------------------------------------------------------------")
+
                 file.seek(0)
                 file.truncate()
                 file.close()
+           
 
 
         time.sleep(120)
