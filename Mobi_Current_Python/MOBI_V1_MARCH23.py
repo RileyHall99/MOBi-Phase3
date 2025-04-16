@@ -1316,9 +1316,11 @@ def task3():
     #         "systemno": sysno,
     # }
         if(is_connected_internet_AWS):
-            with open("location_data_Backup.csv" , "r")as file:
+            with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
+                next(csvFile)
                 for lines in csvFile:
+                    print(f"lines{lines}")
                     data = {
                         "arrivetime" : lines[0],
                         "leavetime" : lines[1],
@@ -1332,9 +1334,9 @@ def task3():
                     #push to OPCUA 
                     status = OPCUA_Upload(data['location'], data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-                    file.seek(0)
-                    file.truncate()
-                    file.close()
+                file.seek(0)
+                file.truncate()
+                file.close()
 
 
         time.sleep(120)
