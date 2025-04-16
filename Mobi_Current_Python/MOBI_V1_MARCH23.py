@@ -1315,6 +1315,8 @@ def task3():
     #         "location": f"Mill {tag}",
     #         "systemno": sysno,
     # }
+    #updated code somethings switched. Checks if we have data then updates both AWS and OPCUA 
+
         if(is_connected_internet_AWS):
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
