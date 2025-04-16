@@ -1307,50 +1307,57 @@ def task3():
 
 
         if(is_connected_internet_AWS):
-            with open("location_data_Backup.csv" , "r+")as file:
-                csvFile = csv.reader(file)
-                try:
-                    first_row = next(csvFile)
-                    print(f"First row: {first_row}")
-                except StopIteration:
-                    print("File is empty or has no rows")
-                    
-                
-                for lines in csvFile:
-                    print(f"Data:{lines}")
-                    mill_name = ""
-                    aws_name = ""
-                    if(lines[4] == "Loading"):
-                        mill_name = "0"
-                        aws_name = "Loading"
-                    else:
-                        print(f"split:{lines[4].split(" ")}")
-                        mill_name = lines[4].split(" ")[1]
-                        aws_name = f"Mill {mill_name}"
-                    data = {
-                        "arrivetime" : lines[0],
-                        "leavetime" : lines[1],
-                        "inweight" : float(lines[2]),
-                        "outweight" : float(lines[3]), 
-                        "location" : aws_name,
-                        "systemno" : lines[5]
-                    }
-
-                    #push to AWS
+            if(client.is_connected()):
+                with open("location_data_Backup.csv" , "r+")as file:
+                    csvFile = csv.reader(file)
                     try:
-                        inf0 = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=1, retain=False)
-                        if inf0[0] == mqtt.MQTT_ERR_SUCCESS:
-                            print(f"Published successfully")
+                        first_row = next(csvFile)
+                        print(f"First row: {first_row}")
+                    except StopIteration:
+                        print("File is empty or has no rows")
+                        
+                    
+                    for lines in csvFile:
+                        print(f"Data:{lines}")
+                        mill_name = ""
+                        aws_name = ""
+                        if(lines[4] == "Loading"):
+                            mill_name = "0"
+                            aws_name = "Loading"
                         else:
-                            print(f"Publish failed with error code: {inf0[0]}")
-                    except Exception as e:
-                        print(f"exception:--------=--------------{e}") 
-                    status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
-                    print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-                file.seek(0)
-                file.truncate()
-                file.close()
+                            print(f"split:{lines[4].split(" ")}")
+                            mill_name = lines[4].split(" ")[1]
+                            aws_name = f"Mill {mill_name}"
+                        data = {
+                            "arrivetime" : lines[0],
+                            "leavetime" : lines[1],
+                            "inweight" : float(lines[2]),
+                            "outweight" : float(lines[3]), 
+                            "location" : aws_name,
+                            "systemno" : lines[5]
+                        }
 
+                        #push to AWS
+                        published_count = 0
+                        while(published_count < 3):
+                            try:
+                                inf0 = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=1, retain=False)
+                                if inf0[0] == mqtt.MQTT_ERR_SUCCESS:
+                                    print(f"Published successfully")
+                                    break
+                                else:
+                                    print(f"Publish failed with error code: {inf0[0]}")
+                                    published_count+=1
+                                    time.sleep(0.5)
+                            except Exception as e:
+                                print(f"exception:--------=--------------{e}") 
+                        status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                        print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+                    file.seek(0)
+                    file.truncate()
+                    file.close()
+        else:
+            connect_to_AWS()
 
         time.sleep(120)
 
