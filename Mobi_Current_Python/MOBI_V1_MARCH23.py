@@ -1043,26 +1043,33 @@ def loadingStart(sysno):
             
     else:
         connectionstatus = True
+    
 
-    if testmode in (1, 2) or connectionstatus == True:
-        with open("location_data.csv", mode="a", newline="") as csv_file:
-            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            if csv_file.tell() == 0:
-                writer.writeheader()
-            writer.writerow(data)
-        #uploading net weight into leave weight at loading
-        status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
-        print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-        print("Loading Complete\n")
-    else:
-        with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
-            fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            if csv_file.tell() == 0:
-                writer.writeheader()
-            writer.writerow(data)
-        print("Connection to AWS failed. Data saved to Backup file\n")
+    for entry in opcua_data_backup:
+        OPCUA_Upload(str(entry.get("systemno", "0")),entry.get("leavetime"),entry.get("outweight"),entry.get("arrivetime"),entry.get("inweight"))
+        print(f"Uploaded one of the data in the backup")
+    
+    
+
+    # if testmode in (1, 2) or connectionstatus == True:
+    #     with open("location_data.csv", mode="a", newline="") as csv_file:
+    #         fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+    #         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+    #         if csv_file.tell() == 0:
+    #             writer.writeheader()
+    #         writer.writerow(data)
+    #     #uploading net weight into leave weight at loading
+    #     status = OPCUA_Upload("0", eTime, (weight-inweight), sTime, inweight)
+    #     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+    #     print("Loading Complete\n")
+    # else:
+    #     with open("location_data_Backup.csv", mode="a", newline="") as csv_file:
+    #         fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
+    #         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+    #         if csv_file.tell() == 0:
+    #             writer.writeheader()
+    #         writer.writerow(data)
+    #     print("Connection to AWS failed. Data saved to Backup file\n")
 
 # start unload process
 def unloadStart(tag, sysno):
