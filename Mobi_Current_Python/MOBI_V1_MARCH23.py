@@ -199,6 +199,23 @@ stop_threads = False
 def on_connect(client, userdata, flags, rc, properties=None):
     print("Connected to AWS IoT: " + str(rc))
 
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+client.on_connect = on_connect
+
+# Verify certificate files exist
+cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
+for cert_file in cert_files:
+    if not os.path.exists(cert_file):
+        print(f"Error: Certificate file not found: {cert_file}")
+        exit()
+        
+client.tls_set(
+    ca_certs=CA_CERT,
+    certfile=CLIENT_CERT,
+    keyfile=PRIVATE_KEY,
+    tls_version=ssl.PROTOCOL_TLS_CLIENT,
+)
+
 # Global flag to signal test mode 
 # 0 = Production mode
 # 1 = test mode By pass AWS / internet connection but still send to OPCUA
@@ -207,27 +224,7 @@ testmode = 0
 
 is_connected_internet_AWS = False
 
-if testmode == 0:
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.on_connect = on_connect
-    
-    # Verify certificate files exist
-    cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
-    for cert_file in cert_files:
-        if not os.path.exists(cert_file):
-            print(f"Error: Certificate file not found: {cert_file}")
-            exit()
-            
-    client.tls_set(
-        ca_certs=CA_CERT,
-        certfile=CLIENT_CERT,
-        keyfile=PRIVATE_KEY,
-        tls_version=ssl.PROTOCOL_TLS_CLIENT,
-    )
-
-    #Can remove for production
-    #client.tls_insecure_set(True)
-
+def connect_to_AWS():
     # Connect to AWS IoT with 3 retries
     num_retries = 3
     for attempt in range(1, num_retries + 1):
@@ -250,12 +247,22 @@ if testmode == 0:
                 "retries. Please ensure the device is connected to the internet and try again. Exiting...",
             )
             # exit()
+            return False
 
         print("Retrying connection in 5 seconds...")
         time.sleep(5)
 
     # Sleep for 10 seconds to let MQTT connect (might need adjustment)
     time.sleep(10)
+    return True
+
+if testmode == 0:
+    if connect_to_AWS():
+        print("AWS IoT connection established.")
+    else:
+        print("AWS IoT connection failed on Initialization. Please ensure the device is connected to the internet and try again Exiting...")
+        exit()
+
 
 # check both Mqtt and API
 def check_network_connection():
@@ -1318,29 +1325,54 @@ def task3():
     #updated code somethings switched. Checks if we have data then updates both AWS and OPCUA 
 
         if(is_connected_internet_AWS):
+            print("---------------------------------------------------------------------------")
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
                 next(csvFile)
+                
                 for lines in csvFile:
+                    print(f"Data:{lines}")
                     mill_name = ""
+                    aws_name = ""
                     if(lines[4] == "Loading"):
                         mill_name = "0"
+                        aws_name = "Loading"
                     else:
+                        print(f"split:{lines[4].split(" ")}")
                         mill_name = lines[4].split(" ")[1]
+                        aws_name = f"Mill {mill_name}"
                     data = {
                         "arrivetime" : lines[0],
                         "leavetime" : lines[1],
-                        "inweight" : lines[2],
-                        "outweight" : lines[3], 
-                        "location" : lines[4],
+                        "inweight" : float(lines[2]),
+                        "outweight" : float(lines[3]), 
+                        "location" : aws_name,
                         "systemno" : lines[5]
                     }
                     #push to AWS
-                    client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    info = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    info.wait_for_publish(3)
                     
+                    print(f"INFORMATION: {info.rc}-------------\n")
+                    connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
+                    print(f"status:{connectionstatus}")
+                    
+                    
+                    check_network_connection()
+                    client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    connectionstatus = False
+                    for i in range(3):
+                        print(f"try: {i}")
+                        connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
+                        if connectionstatus:
+                            break
+                        time.sleep(5)
+                        print("End of sleep 5 ---------------------------------------")
+                        
                     #push to OPCUA 
-                    status = OPCUA_Upload(mill_name, data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                    status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+                    print("---------------------------------------------------------------------------")
                 file.seek(0)
                 file.truncate()
                 file.close()
