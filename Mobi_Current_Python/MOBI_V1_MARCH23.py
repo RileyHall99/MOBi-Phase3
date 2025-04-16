@@ -1285,21 +1285,51 @@ def task3():
         heartbeat_recive("7")
         check_network_connection()
         
-        if(aws_data_upload_queue and is_connected_internet_AWS):
-            print(f"DATA IN QUEUE ==>> {aws_data_upload_queue}")
-            for entry in aws_data_upload_queue:
-                client.publish("raspi/mobi_loc", payload=json.dumps(entry), qos=0, retain=False)
-                connectionstatus = False
-                for i in range(3):
-                    mill_name = ""
-                    if(entry['location'] != "Loading"):
-                        mill_name = "Loading"
-                    else:
-                        mill_name = f"Mill {entry['location']}"
-                    connectionstatus = Connection_Verification(mill_name, entry['leavetime'], entry["outweight"])
-                    if connectionstatus:
-                        break
-                    time.sleep(5)
+        # if(aws_data_upload_queue and is_connected_internet_AWS):
+        #     print(f"DATA IN QUEUE ==>> {aws_data_upload_queue}")
+        #     for entry in aws_data_upload_queue:
+        #         client.publish("raspi/mobi_loc", payload=json.dumps(entry), qos=0, retain=False)
+        #         connectionstatus = False
+        #         for i in range(3):
+        #             mill_name = ""
+        #             if(entry['location'] != "Loading"):
+        #                 mill_name = "Loading"
+        #             else:
+        #                 mill_name = f"Mill {entry['location']}"
+        #             connectionstatus = Connection_Verification(mill_name, entry['leavetime'], entry["outweight"])
+        #             if connectionstatus:
+        #                 break
+        #             time.sleep(5)
+    #     data = {
+    #         "arrivetime": sTime,
+    #         "leavetime": eTime,
+    #         "inweight": (inweight-weight),
+    #         "outweight": weight,
+    #         "location": f"Mill {tag}",
+    #         "systemno": sysno,
+    # }
+        if(is_connected_internet_AWS):
+            with open("location_data_Backup.csv" , "r")as file:
+                csvFile = csv.reader(file)
+                for lines in csvFile:
+                    data = {
+                        "arrivetime" : lines[0],
+                        "leavetime" : lines[1],
+                        "inweight" : lines[2],
+                        "outweight" : lines[3], 
+                        "location" : lines[4],
+                        "systemno" : lines[5]
+                    }
+                    #push to AWS
+                    client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    #push to OPCUA 
+                    status = OPCUA_Upload(data['location'], data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                    print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+                    file.seek(0)
+                    file.truncate()
+                    file.close()
+
+
         time.sleep(120)
 
 def close_connections():
