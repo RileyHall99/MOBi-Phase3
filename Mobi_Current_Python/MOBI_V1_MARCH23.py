@@ -41,6 +41,7 @@ location_status : bool = False
 first_load : bool = False
 c_t1 = None
 aws_data_upload_queue : list = []
+opcua_data_backup : list = []
 def get_correct_ports()-> list: 
     print("Searching for available COM ports...")
     ports = list(serial.tools.list_ports.comports())
@@ -276,20 +277,6 @@ def check_network_connection():
     except socket.gaierror as e:
         is_connected_internet_AWS = False
         print("Unable to resolve the hostname No Internet: ", e)
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
     except requests.ConnectionError as e:
         is_connected_internet_AWS = False
         print("No internet connection. Please check your network.", e)
@@ -808,7 +795,7 @@ def OPCUA_Location_Status(location, status):
         return
     elif not is_connected_internet_AWS:
         print("Not connected to the internet or can't reach AWS")
-        return
+        # return
     try:
         client = Client(OPCUA_Server_URL)
         client.connect()
@@ -1052,11 +1039,12 @@ def loadingStart(sysno):
                 time.sleep(5)
         else:
             aws_data_upload_queue.append(data)
+            opcua_data_backup.append(data)
             
     else:
         connectionstatus = True
 
-    if testmode in (0, 1, 2):
+    if testmode in (1, 2) or connectionstatus == True:
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -1163,7 +1151,7 @@ def unloadStart(tag, sysno):
     else:
         connectionstatus = True
     #local backups of data 
-    if testmode in (0, 1, 2):
+    if testmode in ( 1, 2) or connectionstatus:
         
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
