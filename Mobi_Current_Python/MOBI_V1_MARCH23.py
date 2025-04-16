@@ -1318,28 +1318,54 @@ def task3():
     #updated code somethings switched. Checks if we have data then updates both AWS and OPCUA 
 
         if(is_connected_internet_AWS):
+            print("---------------------------------------------------------------------------")
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
                 next(csvFile)
+                
                 for lines in csvFile:
+                    print(f"Data:{lines}")
                     mill_name = ""
+                    aws_name = ""
                     if(lines[4] == "Loading"):
                         mill_name = "0"
+                        aws_name = "Loading"
                     else:
+                        print(f"split:{lines[4].split(" ")}")
                         mill_name = lines[4].split(" ")[1]
+                        aws_name = f"Mill {mill_name}"
                     data = {
                         "arrivetime" : lines[0],
                         "leavetime" : lines[1],
-                        "inweight" : lines[2],
-                        "outweight" : lines[3], 
-                        "location" : lines[4],
+                        "inweight" : float(lines[2]),
+                        "outweight" : float(lines[3]), 
+                        "location" : aws_name,
                         "systemno" : lines[5]
                     }
                     #push to AWS
+                    info = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    info.wait_for_publish(3)
+                    
+                    print(f"INFORMATION: {info.rc}-------------\n")
+                    connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
+                    print(f"status:{connectionstatus}")
+                    
+                    
+                    check_network_connection()
                     client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    connectionstatus = False
+                    for i in range(3):
+                        print(f"try: {i}")
+                        connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
+                        if connectionstatus:
+                            break
+                        time.sleep(5)
+                        print("End of sleep 5 ---------------------------------------")
+                        
                     #push to OPCUA 
-                    status = OPCUA_Upload(mill_name, data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                    status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
+                    print("---------------------------------------------------------------------------")
                 file.seek(0)
                 file.truncate()
                 file.close()
