@@ -1,9 +1,9 @@
 """
 File: Mobi.py
 Description: This code processes data from the scale and mill/loading site and uploads it to AWS and the OPCUA server
-Author: Zion Chong
+Author: Zion Chong, Benjamin Reynolds, Riley Hall
 Created: 2024-07-4
-Detail: Has variance and old for OPCUA location 1/0 Changes from 02_26 test 
+Detail: Working code tested April 15 at eduardos house 
 """
 
 # a3hf0azjmdr1le-ats.iot.us-east-2.amazonaws.com
@@ -40,7 +40,7 @@ last_known_location : str = "0"
 location_status : bool = False
 first_load : bool = False
 c_t1 = None
-
+aws_data_upload_queue : list = []
 def get_correct_ports()-> list: 
     print("Searching for available COM ports...")
     ports = list(serial.tools.list_ports.comports())
@@ -202,7 +202,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 # 0 = Production mode
 # 1 = test mode By pass AWS / internet connection but still send to OPCUA
 # 2 = test mode By pass AWS / internet connection and bypass OPCUA
-testmode = 0
+testmode = 1
 
 is_connected_internet_AWS = False
 
@@ -248,7 +248,7 @@ if testmode == 0:
                 num_retries,
                 "retries. Please ensure the device is connected to the internet and try again. Exiting...",
             )
-            exit()
+            # exit()
 
         print("Retrying connection in 5 seconds...")
         time.sleep(5)
@@ -276,6 +276,20 @@ def check_network_connection():
     except socket.gaierror as e:
         is_connected_internet_AWS = False
         print("Unable to resolve the hostname No Internet: ", e)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
     except requests.ConnectionError as e:
         is_connected_internet_AWS = False
         print("No internet connection. Please check your network.", e)
@@ -468,7 +482,7 @@ def OPCUA_Upload(location, leavetime, outweight, arrivetime, inweight):
         return
     elif not is_connected_internet_AWS:
         print("Not connected to the internet or can't reach AWS")
-        return False
+        # return False
 
     try:
         client = Client(OPCUA_Server_URL)
@@ -1020,23 +1034,29 @@ def loadingStart(sysno):
         "arrivetime": sTime,
         "leavetime": eTime,
         "inweight": inweight,
-        "outweight": weight,
+        "outweight": (weight-inweight),
         "location": "Loading",
         "systemno": sysno,
     }
 
     if testmode == 0:
-        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-        connectionstatus = False
-        for i in range(3):
-            connectionstatus = Connection_Verification("Loading", eTime, weight)
-            if connectionstatus:
-                break
-            time.sleep(5)
+        check_network_connection()
+        if(is_connected_internet_AWS):
+            
+            client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+            connectionstatus = False
+            for i in range(3):
+                connectionstatus = Connection_Verification("Loading", eTime, weight)
+                if connectionstatus:
+                    break
+                time.sleep(5)
+        else:
+            aws_data_upload_queue.append(data)
+            
     else:
         connectionstatus = True
 
-    if connectionstatus or testmode in (1, 2):
+    if testmode in (0, 1, 2):
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -1120,24 +1140,30 @@ def unloadStart(tag, sysno):
     data = {
         "arrivetime": sTime,
         "leavetime": eTime,
-        "inweight": inweight,
+        "inweight": (inweight-weight),
         "outweight": weight,
         "location": f"Mill {tag}",
         "systemno": sysno,
     }
     #AWS backup 
     if testmode == 0:
-        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-        connectionstatus = False
-        for i in range(3):
-            connectionstatus = Connection_Verification(f"Mill {tag}", eTime, weight)
-            if connectionstatus:
-                break
-            time.sleep(5)
+        global is_connected_internet_AWS
+        check_network_connection()
+        if(is_connected_internet_AWS):
+            
+            client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+            connectionstatus = False
+            for i in range(3):
+                connectionstatus = Connection_Verification(f"Mill {tag}", eTime, weight)
+                if connectionstatus:
+                    break
+                time.sleep(5)
+        else:
+            aws_data_upload_queue.append(data)
     else:
         connectionstatus = True
     #local backups of data 
-    if connectionstatus or testmode in (1, 2):
+    if testmode in (0, 1, 2):
         
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
@@ -1269,6 +1295,23 @@ def task3():
         except Exception as e:
             print(f"Error in task3 OPCUA_Heartbeat : {e}")
         heartbeat_recive("7")
+        check_network_connection()
+        
+        if(aws_data_upload_queue and is_connected_internet_AWS):
+            print(f"DATA IN QUEUE ==>> {aws_data_upload_queue}")
+            for entry in aws_data_upload_queue:
+                client.publish("raspi/mobi_loc", payload=json.dumps(entry), qos=0, retain=False)
+                connectionstatus = False
+                for i in range(3):
+                    mill_name = ""
+                    if(entry['location'] != "Loading"):
+                        mill_name = "Loading"
+                    else:
+                        mill_name = f"Mill {entry['location']}"
+                    connectionstatus = Connection_Verification(mill_name, entry['leavetime'], entry["outweight"])
+                    if connectionstatus:
+                        break
+                    time.sleep(5)
         time.sleep(120)
 
 def close_connections():
