@@ -1309,9 +1309,14 @@ def task3():
     #         "systemno": sysno,
     # }
         if(is_connected_internet_AWS):
-            with open("location_data_Backup.csv" , "r")as file:
+            with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
                 for lines in csvFile:
+                    mill_name = ""
+                    if(lines[4] == "Loading"):
+                        mill_name = "0"
+                    else:
+                        mill_name = lines[4].split(" ")[1]
                     data = {
                         "arrivetime" : lines[0],
                         "leavetime" : lines[1],
@@ -1323,11 +1328,11 @@ def task3():
                     #push to AWS
                     client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
                     #push to OPCUA 
-                    status = OPCUA_Upload(data['location'], data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                    status = OPCUA_Upload(mill_name, data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-                    file.seek(0)
-                    file.truncate()
-                    file.close()
+                file.seek(0)
+                file.truncate()
+                file.close()
 
 
         time.sleep(120)

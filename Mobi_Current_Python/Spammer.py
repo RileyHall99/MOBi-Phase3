@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     # c_t1 = Timer(120.0, heartbeats , args=(ser,))
     c_t1 = threading.Thread(target=heartbeats , args=(ser,))
-    c_t1.start()
+    # c_t1.start()
 
     #INFO How to run ==>> Comment one out and let it run.
     #MILL1 TEST LOOP
