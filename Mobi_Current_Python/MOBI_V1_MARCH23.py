@@ -1337,6 +1337,7 @@ def task3():
                     }
                     #push to AWS
                     client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+                    
                     #push to OPCUA 
                     status = OPCUA_Upload(mill_name, data["leavetime"], data["outweight"], data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                     print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
