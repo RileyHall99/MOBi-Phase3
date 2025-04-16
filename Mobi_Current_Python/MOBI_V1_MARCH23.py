@@ -204,7 +204,7 @@ def on_publish(client, userdata, mid):
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
-client.on_publish = on_publish
+# client.on_publish = on_publish
 
 # Verify certificate files exist
 cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
@@ -1333,21 +1333,13 @@ def task3():
 
                     #push to AWS
                     try:
-                        client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=1, retain=False)
-                    
+                        inf0 = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=1, retain=False)
+                        if inf0[0] == mqtt.MQTT_ERR_SUCCESS:
+                            print(f"Published successfully")
+                        else:
+                            print(f"Publish failed with error code: {inf0[0]}")
                     except Exception as e:
                         print(f"exception:--------=--------------{e}") 
-                
-                    for i in range(3):
-                        print(f"try: {i}")
-                        connectionstatus = Connection_Verification(data["location"], data['leavetime'], data["outweight"])
-                        if connectionstatus:
-                            break
-                        time.sleep(5)
-                    #push to OPCUA 
-                    status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
-                    print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
-
                 file.seek(0)
                 file.truncate()
                 file.close()
