@@ -199,6 +199,23 @@ stop_threads = False
 def on_connect(client, userdata, flags, rc, properties=None):
     print("Connected to AWS IoT: " + str(rc))
 
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+client.on_connect = on_connect
+
+# Verify certificate files exist
+cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
+for cert_file in cert_files:
+    if not os.path.exists(cert_file):
+        print(f"Error: Certificate file not found: {cert_file}")
+        exit()
+        
+client.tls_set(
+    ca_certs=CA_CERT,
+    certfile=CLIENT_CERT,
+    keyfile=PRIVATE_KEY,
+    tls_version=ssl.PROTOCOL_TLS_CLIENT,
+)
+
 # Global flag to signal test mode 
 # 0 = Production mode
 # 1 = test mode By pass AWS / internet connection but still send to OPCUA
@@ -207,27 +224,7 @@ testmode = 0
 
 is_connected_internet_AWS = False
 
-if testmode == 0:
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.on_connect = on_connect
-    
-    # Verify certificate files exist
-    cert_files = [CA_CERT, CLIENT_CERT, PRIVATE_KEY]
-    for cert_file in cert_files:
-        if not os.path.exists(cert_file):
-            print(f"Error: Certificate file not found: {cert_file}")
-            exit()
-            
-    client.tls_set(
-        ca_certs=CA_CERT,
-        certfile=CLIENT_CERT,
-        keyfile=PRIVATE_KEY,
-        tls_version=ssl.PROTOCOL_TLS_CLIENT,
-    )
-
-    #Can remove for production
-    #client.tls_insecure_set(True)
-
+def connect_to_AWS():
     # Connect to AWS IoT with 3 retries
     num_retries = 3
     for attempt in range(1, num_retries + 1):
@@ -250,12 +247,22 @@ if testmode == 0:
                 "retries. Please ensure the device is connected to the internet and try again. Exiting...",
             )
             # exit()
+            return False
 
         print("Retrying connection in 5 seconds...")
         time.sleep(5)
 
     # Sleep for 10 seconds to let MQTT connect (might need adjustment)
     time.sleep(10)
+    return True
+
+if testmode == 0:
+    if connect_to_AWS():
+        print("AWS IoT connection established.")
+    else:
+        print("AWS IoT connection failed on Initialization. Please ensure the device is connected to the internet and try again Exiting...")
+        exit()
+
 
 # check both Mqtt and API
 def check_network_connection():
