@@ -130,16 +130,16 @@ else:
     )
     print()  # Newline for readability
 
-# Display the final parameters
-print("Final Parameters:")
-print(f"  Bucket Weight: {BUCKET_WEIGHT} kg")
-print(f"  Max Residual Weight: {MAX_RESIDUAL_WEIGHT} kg")
-print(f"  Min Material Weight: {MIN_MATERIAL_WEIGHT} kg")
-print(f"  Min Weight Drop: {MIN_WEIGHT_DROP} kg")
-print(f"  Stability Variance: {STABILITY_VARIANCE} kg²")
-print(f"  Timeout: {TIMEOUT} seconds")
-print(f"  Weight Buffer: {WEIGHT_BUFFER_COUNT} kg")
-print()
+# # Display the final parameters
+# print("Final Parameters:")
+# print(f"  Bucket Weight: {BUCKET_WEIGHT} kg")
+# print(f"  Max Residual Weight: {MAX_RESIDUAL_WEIGHT} kg")
+# print(f"  Min Material Weight: {MIN_MATERIAL_WEIGHT} kg")
+# print(f"  Min Weight Drop: {MIN_WEIGHT_DROP} kg")
+# print(f"  Stability Variance: {STABILITY_VARIANCE} kg²")
+# print(f"  Timeout: {TIMEOUT} seconds")
+# print(f"  Weight Buffer: {WEIGHT_BUFFER_COUNT} kg")
+# print()
 
 # OPCUA Server URL
 OPCUA_Server_URL = "opc.tcp://admin@localhost:4840/freeopcua/server/"
@@ -253,6 +253,7 @@ def connect_to_AWS():
                 "retries. Please ensure the device is connected to the internet and try again. Exiting...",
             )
             # exit()
+        
             return False
 
         print("Retrying connection in 5 seconds...")
@@ -266,8 +267,9 @@ if testmode == 0:
     if connect_to_AWS():
         print("AWS IoT connection established.")
     else:
-        print("AWS IoT connection failed on Initialization. Please ensure the device is connected to the internet and try again Exiting...")
-        exit()
+        print("AWS IoT connection failed on Initialization. Please ensure the device is connected to the internet and try again Exiting... Data will be collected, but not uploaded to OPCUA or to AWS")
+        time.sleep(5)
+        # exit()
 
 
 # check both Mqtt and API
@@ -970,6 +972,7 @@ def loadingStart(sysno):
     print("STARTING LOADING")
     global location_status
     global first_load
+    result = False
     heartbeat_recive("0")
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Loading at {sTime}\n")
@@ -1043,28 +1046,26 @@ def loadingStart(sysno):
         check_network_connection()
         if(is_connected_internet_AWS):
             
-            client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-            connectionstatus = False
-            for i in range(3):
-                connectionstatus = Connection_Verification("Loading", eTime, weight)
-                if connectionstatus:
-                    break
-                time.sleep(5)
+            inf0 = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+            if inf0[0] == mqtt.MQTT_ERR_SUCCESS:
+                print("Succes to AWS")
+                result = True
+            # for i in range(3):
+            #     connectionstatus = Connection_Verification("Loading", eTime, weight)
+            #     if connectionstatus:
+            #         break
+            #     time.sleep(5)
         else:
             aws_data_upload_queue.append(data)
             opcua_data_backup.append(data)
-            
-    else:
-        connectionstatus = True
     
-
     # for entry in opcua_data_backup:
     #     OPCUA_Upload(str(entry.get("systemno", "0")),entry.get("leavetime"),entry.get("outweight"),entry.get("arrivetime"),entry.get("inweight"))
     #     print(f"Uploaded one of the data in the backup")
     
     
 
-    if testmode in (1, 2) or connectionstatus == True:
+    if testmode in (1, 2) or result:
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -1088,14 +1089,10 @@ def loadingStart(sysno):
 def unloadStart(tag, sysno):
     heartbeat_recive(str(tag))
     global location_status
+    result = False
     sTime = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     print(f"SYSTEM {sysno} Start Monitoring for Mill {tag} at {sTime}\n")
     inweight = scaleWeight()
-
-    # Buffer for stability check (5 seconds)
-    weight_buffer = []
-    start_time = time.time()
-    leave_counter = 0
 
     # Initial location check
     while location_status:
@@ -1155,23 +1152,25 @@ def unloadStart(tag, sysno):
     }
     #AWS backup 
     if testmode == 0:
-        global is_connected_internet_AWS
         check_network_connection()
         if(is_connected_internet_AWS):
             
-            client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
-            connectionstatus = False
-            for i in range(3):
-                connectionstatus = Connection_Verification(f"Mill {tag}", eTime, weight)
-                if connectionstatus:
-                    break
-                time.sleep(5)
+            inf0 = client.publish("raspi/mobi_loc", payload=json.dumps(data), qos=0, retain=False)
+            if inf0[0] == mqtt.MQTT_ERR_SUCCESS:
+                print("Succes to AWS")
+                result = True
+            # for i in range(3):
+            #     connectionstatus = Connection_Verification("Loading", eTime, weight)
+            #     if connectionstatus:
+            #         break
+            #     time.sleep(5)
         else:
             aws_data_upload_queue.append(data)
-    else:
-        connectionstatus = True
+            opcua_data_backup.append(data)
+        
+        
     #local backups of data 
-    if testmode in ( 1, 2) or connectionstatus:
+    if testmode in ( 1, 2) or result:
         
         with open("location_data.csv", mode="a", newline="") as csv_file:
             fieldnames = ["arrivetime", "leavetime", "inweight", "outweight", "location", "systemno"]
@@ -1306,10 +1305,16 @@ def task3():
         heartbeat_recive("7")
         check_network_connection()
 
+
         if(is_connected_internet_AWS):
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
-                next(csvFile)
+                try:
+                    first_row = next(csvFile)
+                    print(f"First row: {first_row}")
+                except StopIteration:
+                    print("File is empty or has no rows")
+                    
                 
                 for lines in csvFile:
                     print(f"Data:{lines}")
@@ -1340,6 +1345,8 @@ def task3():
                             print(f"Publish failed with error code: {inf0[0]}")
                     except Exception as e:
                         print(f"exception:--------=--------------{e}") 
+                    status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
+                    print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
                 file.seek(0)
                 file.truncate()
                 file.close()
