@@ -203,7 +203,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 # 0 = Production mode
 # 1 = test mode By pass AWS / internet connection but still send to OPCUA
 # 2 = test mode By pass AWS / internet connection and bypass OPCUA
-testmode = 1
+testmode = 0
 
 is_connected_internet_AWS = False
 
@@ -1043,6 +1043,13 @@ def loadingStart(sysno):
             
     else:
         connectionstatus = True
+    
+
+    # for entry in opcua_data_backup:
+    #     OPCUA_Upload(str(entry.get("systemno", "0")),entry.get("leavetime"),entry.get("outweight"),entry.get("arrivetime"),entry.get("inweight"))
+    #     print(f"Uploaded one of the data in the backup")
+    
+    
 
     if testmode in (1, 2) or connectionstatus == True:
         with open("location_data.csv", mode="a", newline="") as csv_file:
@@ -1311,6 +1318,7 @@ def task3():
         if(is_connected_internet_AWS):
             with open("location_data_Backup.csv" , "r+")as file:
                 csvFile = csv.reader(file)
+                next(csvFile)
                 for lines in csvFile:
                     mill_name = ""
                     if(lines[4] == "Loading"):
