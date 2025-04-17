@@ -1307,6 +1307,7 @@ def task3():
 
 
         if(is_connected_internet_AWS):
+            
             if(client.is_connected()):
                 with open("location_data_Backup.csv" , "r+")as file:
                     csvFile = csv.reader(file)
@@ -1328,6 +1329,7 @@ def task3():
                             print(f"split:{lines[4].split(" ")}")
                             mill_name = lines[4].split(" ")[1]
                             aws_name = f"Mill {mill_name}"
+                            #need it here 
                         data = {
                             "arrivetime" : lines[0],
                             "leavetime" : lines[1],
@@ -1356,8 +1358,8 @@ def task3():
                     file.seek(0)
                     file.truncate()
                     file.close()
-        else:
-            connect_to_AWS()
+            else:
+                connect_to_AWS()
 
         time.sleep(120)
 
