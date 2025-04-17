@@ -1305,6 +1305,7 @@ def task3():
         heartbeat_recive("7")
         check_network_connection()
 
+        print(f"is coneccted to AWS: {is_connected_internet_AWS}")
 
         if(is_connected_internet_AWS):
             if(client.is_connected()):
@@ -1356,8 +1357,8 @@ def task3():
                     file.seek(0)
                     file.truncate()
                     file.close()
-        else:
-            connect_to_AWS()
+            else:
+                connect_to_AWS()
 
         time.sleep(120)
 
