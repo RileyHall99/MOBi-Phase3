@@ -51,7 +51,7 @@ ports = get_correct_ports()
 # ports = None
 port_scale : str = ""
 port_loc : str = ""
-print(f"ports!!! ==>> {ports}")
+# print(f"ports!!! ==>> {ports}")
 if(ports):
     for i in ports: 
         print(f"ports {i.description}")
@@ -363,15 +363,15 @@ def heartbeat_recive(location):
         print("Heartbeat Recived but not sent\n")
 
 def process_input_data(data_loc : str):
-    print(f"PROCESSING DATA ==>> {data_loc}")
+    
     try:
         if data_loc == "+OK" or data_loc == "" or "ERR" in data_loc.upper():
         #If returning +Ok it could be the LoRa power cycling and might need the parameter rerun 
-            print("RETURNING ERROR!")
+            
             return ["error"]
         else:
                 t1 = time.time()
-                print(f"THIS IS DATA RECEIVED ==>> {data_loc} ")
+                
                 data = (
                     data_loc.split(",")[2]
                     .replace("#", ",")
@@ -491,7 +491,7 @@ def OPCUA_Upload(location, leavetime, outweight, arrivetime, inweight):
         client.connect()
         root = client.get_root_node()
         objects = root.get_children()[0]
-        print(f"THIS IS LOCATION AT LINE #462 ==> {location}")
+        
         if location == "0":
             loading_zone = objects.get_child(["2:Loading Zone"])
             loading = loading_zone.get_children()[0]
@@ -609,7 +609,7 @@ def OPCUA_Upload(location, leavetime, outweight, arrivetime, inweight):
 # Updates the heartbeat in OPCUA current heartbeat frecuency from Mill/Loading is every 10 minutes OPCUA HB resets every 1000 counts should be around 7 days
 def OPCUA_Heartbeat(location):
 
-    print(f"OPCUA HEARTBEAT ==>> LOCATION ==>> {location}")
+    
     def _get_variant_type(value):
         if isinstance(value, int):
             return ua.VariantType.Int64
@@ -758,7 +758,7 @@ def OPCUA_Raw_weight(time, weight):
 def call_back_timer(): 
     global location_status
     location_status = False
-    print(f"CALL BACK TIMER!!!!!!! ==>> {last_known_location}")
+    
     client = Client(OPCUA_Server_URL)
     client.connect()
     root = client.get_root_node()
@@ -794,7 +794,7 @@ def call_back_timer():
             var.get_browse_name().Name: var for var in mill_folder.get_children()
         }
         mill_vars[f"Mill {last_known_location} Status"].set_value(False, varianttype=ua.VariantType.Boolean)
-        print("VALUE SWITCHED TO NEGATIVE")
+        
     client.disconnect()
         
 #Switching function to deal with constant positives negatives. Trying to nomalize the line. 
@@ -803,7 +803,7 @@ def call_back_timer():
 def OPCUA_Location_Status(location, status):
     global last_known_location
     global c_t1
-    print(f"SETTING LOCATION STATUS {location}")
+    
     if testmode == 1:
         pass
     elif testmode == 2:
@@ -851,10 +851,10 @@ def OPCUA_Location_Status(location, status):
                         #TODO Implement a callback timer here ~10 seconds 
                         
                         c_t1.start()
-                        print("TIMER STARTED!!!!")
+                        
                 else:
                     c_t1.start()
-                    print("TIMER STARTED ")
+                    
                     if(last_known_location != "0"):
                         mill_name = f"Mill {last_known_location}"
                         mills_folder = objects.get_child(["2:Mills"])
@@ -864,7 +864,7 @@ def OPCUA_Location_Status(location, status):
                                 mill_folder = child
                                 break    
                             
-                        print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+
                         mill_vars = {
                             var.get_browse_name().Name: var for var in mill_folder.get_children()
                         }
@@ -927,7 +927,7 @@ def OPCUA_Location_Status(location, status):
                         #TODO Implement a callback timer here ~10 seconds 
                         
                         c_t1.start()
-                        print("TIMER STARTED LCATION IS THE SAME")
+                        
                 except Exception as e:
                     print(f"Error updating {mill_name} Status to OPCUA: {e}")
             else:
@@ -939,13 +939,12 @@ def OPCUA_Location_Status(location, status):
                             if child.get_browse_name().Name == mill_name:
                                 mill_folder = child
                                 break    
-                            
-                        print(f"hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{mill_name}")  
+
                         mill_vars = {
                             var.get_browse_name().Name: var for var in mill_folder.get_children()
                         }
                         mill_vars[f"Mill {last_known_location} Status"].set_value(False , varianttype=ua.VariantType.Boolean)
-                        print(f"LOCATION CHANGED ==>> {last_known_location}")
+                        
                     else:
                         loading_zone = objects.get_child(["2:Loading Zone"])
                         loading = loading_zone.get_children()[
@@ -969,7 +968,7 @@ def OPCUA_Location_Status(location, status):
 
 # Loading location fill up logic
 def loadingStart(sysno):
-    print("STARTING LOADING")
+    
     global location_status
     global first_load
     result = False
@@ -983,8 +982,7 @@ def loadingStart(sysno):
     else:
         inweight = scaleWeight()
         
-    print(f"Location status {location_status}------------------------------------------------")
-        
+    
     # Initial location check
     #INFO The Variable location_status is set to true when OPCUA_Location_Status is called and set to false when call_back_timer is called. 
     #INFO The reason for this to to only track the load when it has left the location  
@@ -992,7 +990,6 @@ def loadingStart(sysno):
     while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
-        print(f"Location status thingy  {location_status} ------------------------------------------------")
         if data_loc[0] == "Location" and data_loc[1] == "0":
             OPCUA_Location_Status("0", 2)
             # break
@@ -1006,7 +1003,7 @@ def loadingStart(sysno):
             if data_loc[1] in ["1", "2", "3", "4", "5", "6"]:
                 OPCUA_Location_Status(data_loc[1], 2)
             return
-        print("End of While Statement in loading start")
+        
     
 
     weight = scaleWeight()
@@ -1098,7 +1095,7 @@ def unloadStart(tag, sysno):
     while location_status:
         data_loc = mill_recive()
         data_loc = process_input_data(data_loc)
-        print(f"THIS IS UNLOAD START ==>> {data_loc}")
+        
         if data_loc[0] == "Location" and data_loc[1] == tag:  # Fixed condition
             OPCUA_Location_Status(tag, 2)
             # break
@@ -1114,7 +1111,7 @@ def unloadStart(tag, sysno):
             return
 
     # Monitor weight for unloading
-    print("Ater call back timer loop=----------------------------------")
+    
     
     weight = scaleWeight()
     
@@ -1201,7 +1198,6 @@ def task1():
         response = None
         with loc_lock:
             response = mill_recive()
-            print(f"RESPONSE==>>{response}")
         #Change 1 ==>> Process the data outside of the thread lock. Allow other threads to execute 
         response = process_input_data(response)
 
@@ -1268,7 +1264,6 @@ def task2():
     global stop_threads  # Access the global flag
     while not stop_threads:  # Check the flag in the loop
         time.sleep(2)  # Or 3, depends on how often you want to publish.
-        print("OPCUA-RAW-WEIGHT")
         weight = scaleWeight()
         Time = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         if testmode == 1 or testmode == 2:
@@ -1326,7 +1321,7 @@ def task3():
                             mill_name = "0"
                             aws_name = "Loading"
                         else:
-                            print(f"split:{lines[4].split(" ")}")
+                            # print(f"split:{lines[4].split(" ")}")
                             mill_name = lines[4].split(" ")[1]
                             aws_name = f"Mill {mill_name}"
                             #need it here 
@@ -1352,7 +1347,7 @@ def task3():
                                     published_count+=1
                                     time.sleep(0.5)
                             except Exception as e:
-                                print(f"exception:--------=--------------{e}") 
+                                print(f"exception:-----------------------{e}") 
                         status = OPCUA_Upload(mill_name,data["leavetime"], float(data["outweight"]), data["arrivetime"], (float(data["inweight"])-float(data["outweight"])))
                         print("Data uploaded to OPCUA Server\n" if status else "OPCUA upload failed\n")
                     file.seek(0)
