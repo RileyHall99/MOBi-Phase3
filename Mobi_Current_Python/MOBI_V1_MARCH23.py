@@ -1300,6 +1300,7 @@ def task3():
         heartbeat_recive("7")
         check_network_connection()
 
+        print(f"is coneccted to AWS: {is_connected_internet_AWS}")
 
         if(is_connected_internet_AWS):
             
