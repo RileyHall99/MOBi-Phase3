@@ -35,13 +35,15 @@ baudrate_loc = 115200
 
 FORMAT = r"^(\-?\d+\.?\d*)"
 SLEEP_TIME = 1
+#Global Variables 
+last_known_location : str = "0" #Keeps track of the last known location. Too see if location has changed, or if bucket is moving 
+location_status : bool = False #Everytime location is scanned it is set to true, after 20 seconds if no location is scanned it gets set to False 
+first_load : bool = False #First load is to check if its the first load is being calculated 
+c_t1 = None #Is used to be  our 20 second timer 
+aws_data_upload_queue : list = [] #Depricated 
+opcua_data_backup : list = [] #Depreicated 
 
-last_known_location : str = "0"
-location_status : bool = False
-first_load : bool = False
-c_t1 = None
-aws_data_upload_queue : list = []
-opcua_data_backup : list = []
+#Gets all the COM ports of computer (Just the open ones)
 def get_correct_ports()-> list: 
     print("Searching for available COM ports...")
     ports = list(serial.tools.list_ports.comports())
